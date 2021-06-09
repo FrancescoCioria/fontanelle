@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import throttle from "lodash/throttle";
-import mapboxgl from "mapbox-gl";
+import { Map } from "mapbox-gl";
 import View from "react-flexview";
 import { Option, none, some, map } from "fp-ts/lib/Option";
 import getDrinkingWater, { DrinkingWaterNode } from "./getDrinkingWater";
@@ -10,10 +10,13 @@ import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./map.scss";
 
-/* eslint-disable array-callback-return */
+const mapboxgl = require("mapbox-gl/dist/mapbox-gl-csp");
 
-class Map extends React.PureComponent<{}> {
-  map: Option<mapboxgl.Map> = none;
+mapboxgl.workerClass =
+  require("worker-loader!mapbox-gl/dist/mapbox-gl-csp-worker").default;
+
+class MapFountains extends React.PureComponent<{}> {
+  map: Option<Map> = none;
 
   drinkingWaterNodes: {
     [id: string]: DrinkingWaterNode;
@@ -22,7 +25,7 @@ class Map extends React.PureComponent<{}> {
   drinkingWaterMarkers: mapboxgl.Marker[] = [];
 
   updateDrinkingWater = throttle(() => {
-    map<mapboxgl.Map, void>(map => {
+    map<Map, void>(map => {
       getDrinkingWater({
         around: 20000,
         lat: map.getCenter().lat,
@@ -35,7 +38,7 @@ class Map extends React.PureComponent<{}> {
     (mapboxgl as any).accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
 
-    const map = new mapboxgl.Map({
+    const map: Map = new mapboxgl.Map({
       container: "map",
       style:
         "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
@@ -65,7 +68,7 @@ class Map extends React.PureComponent<{}> {
   }
 
   addWaterMarkers = (drinkingWaterNodes: DrinkingWaterNode[]) => {
-    map<mapboxgl.Map, void>(map => {
+    map<Map, void>(map => {
       drinkingWaterNodes.forEach(drinkingWaterNode => {
         if (!this.drinkingWaterNodes[drinkingWaterNode.id]) {
           const element = document.createElement("div");
@@ -91,7 +94,7 @@ class Map extends React.PureComponent<{}> {
 
   componentDidUpdate() {
     requestAnimationFrame(() => {
-      map<mapboxgl.Map, void>(map => map.resize())(this.map);
+      map<Map, void>(map => map.resize())(this.map);
     });
   }
 
@@ -100,4 +103,4 @@ class Map extends React.PureComponent<{}> {
   }
 }
 
-export default Map;
+export default MapFountains;
