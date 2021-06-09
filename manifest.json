@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Fontanelle",
+  "name": "Localizza la fontanella più vicina",
   "icons": [
     {
       "src": "favicon.ico",
