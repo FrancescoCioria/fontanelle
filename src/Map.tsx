@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import throttle from "lodash/throttle";
+import debounce from "lodash/debounce";
 import { Map } from "mapbox-gl";
 import View from "react-flexview";
 import { Option, none, some, map } from "fp-ts/lib/Option";
@@ -24,15 +24,15 @@ class MapFountains extends React.PureComponent<{}> {
 
   drinkingWaterMarkers: mapboxgl.Marker[] = [];
 
-  updateDrinkingWater = throttle(() => {
+  updateDrinkingWater = debounce(() => {
     map<Map, void>(map => {
       getDrinkingWater({
-        around: 20000,
+        around: 2000,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       }).then(this.addWaterMarkers);
     })(this.map);
-  }, 1000);
+  }, 200);
 
   initializeMap() {
     (mapboxgl as any).accessToken =
