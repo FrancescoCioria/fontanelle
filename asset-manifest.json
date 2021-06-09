@@ -5,17 +5,17 @@
     "main.js.map": "/fontanelle/static/js/main.8ff83986.chunk.js.map",
     "runtime-main.js": "/fontanelle/static/js/runtime-main.1047cc81.js",
     "runtime-main.js.map": "/fontanelle/static/js/runtime-main.1047cc81.js.map",
-    "static/css/2.9bf3e30e.chunk.css": "/fontanelle/static/css/2.9bf3e30e.chunk.css",
+    "static/css/2.d5a5869d.chunk.css": "/fontanelle/static/css/2.d5a5869d.chunk.css",
     "static/js/2.ceb9608a.chunk.js": "/fontanelle/static/js/2.ceb9608a.chunk.js",
     "static/js/2.ceb9608a.chunk.js.map": "/fontanelle/static/js/2.ceb9608a.chunk.js.map",
     "index.html": "/fontanelle/index.html",
-    "static/css/2.9bf3e30e.chunk.css.map": "/fontanelle/static/css/2.9bf3e30e.chunk.css.map",
+    "static/css/2.d5a5869d.chunk.css.map": "/fontanelle/static/css/2.d5a5869d.chunk.css.map",
     "static/css/main.4ddc127c.chunk.css.map": "/fontanelle/static/css/main.4ddc127c.chunk.css.map",
     "static/js/2.ceb9608a.chunk.js.LICENSE.txt": "/fontanelle/static/js/2.ceb9608a.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
     "static/js/runtime-main.1047cc81.js",
-    "static/css/2.9bf3e30e.chunk.css",
+    "static/css/2.d5a5869d.chunk.css",
     "static/js/2.ceb9608a.chunk.js",
     "static/css/main.4ddc127c.chunk.css",
     "static/js/main.8ff83986.chunk.js"
