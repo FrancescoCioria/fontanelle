@@ -1,0 +1,9 @@
+#map {
+  position: relative;
+  overflow: hidden;
+  z-index: 2;
+
+  .mapboxgl-canvas {
+    position: static;
+  }
+}
