@@ -38,33 +38,42 @@ class MapFountains extends React.PureComponent<{}> {
     (mapboxgl as any).accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
 
-    const map: Map = new mapboxgl.Map({
-      container: "map",
-      style:
-        "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
-      center: {
-        lat: parseFloat(localStorage.getItem("start_lat") || "45.46"),
-        lng: parseFloat(localStorage.getItem("start_lng") || "9.19")
-      },
-      zoom: 15.0,
-      scrollZoom: false
-    });
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(e => {
+        const map: Map = new mapboxgl.Map({
+          container: "map",
+          style:
+            "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
+          center: {
+            lat: e.coords.latitude,
+            lng: e.coords.longitude
+          },
+          zoom: 15.0,
+          scrollZoom: false
+        });
 
-    map.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        }
-      })
-    );
+        map.addControl(
+          new mapboxgl.GeolocateControl({
+            positionOptions: {
+              enableHighAccuracy: true
+            },
+            trackUserLocation: true
+          })
+        );
 
-    map.on("load", () => {
-      this.map = some(map);
+        map.on("load", () => {
+          this.map = some(map);
 
-      this.updateDrinkingWater();
-    });
+          this.updateDrinkingWater();
 
-    map.on("move", this.updateDrinkingWater);
+          (
+            document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
+          )?.click();
+        });
+
+        map.on("move", this.updateDrinkingWater);
+      });
+    }
   }
 
   addWaterMarkers = (drinkingWaterNodes: DrinkingWaterNode[]) => {
