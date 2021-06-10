@@ -5,13 +5,13 @@ export default async (options: {
   lat: number;
   lng: number;
 }): Promise<DrinkingWaterNode[]> => {
-  // round to closest even decimal (ex: 45.53 -> 45.6; 45.49 -> 45.4)
-  // const roundedLat = Math.round(options.lat * 5) / 5;
-  // const roundedLng = Math.round(options.lng * 5) / 5;
+  // round to second decimal (ex: 45.537 -> 45.54; 45.4923 -> 45.49)
+  const roundedLat = Math.round(options.lat * 100) / 100;
+  const roundedLng = Math.round(options.lng * 100) / 100;
 
   const formData = `
     [out:json];
-    (node["amenity"="drinking_water"](around:${options.around},${options.lat},${options.lng}););
+    (node["amenity"="drinking_water"](around:${options.around},${roundedLat},${roundedLng}););
     out;>;out;
   `;
 
