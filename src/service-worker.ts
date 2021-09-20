@@ -99,6 +99,27 @@ registerRoute(
   })
 );
 
+registerRoute(
+  ({ url }) => {
+    return (
+      url.origin === "https://api.mapbox.com" &&
+      url.pathname === "/styles/v1/francescocioria/cjqi3u6lmame92rmw6aw3uyhm"
+    );
+  },
+  new CacheFirst({
+    cacheName: "mapbox-styles",
+    plugins: [
+      new ExpirationPlugin({
+        // Only cache requests for a week
+        maxAgeSeconds: 7 * 24 * 60 * 60
+      }),
+      new CacheableResponsePlugin({
+        statuses: [0, 200]
+      })
+    ]
+  })
+);
+
 self.addEventListener("fetch", event => {
   // return GET requests "cache-first"
   event.respondWith(
