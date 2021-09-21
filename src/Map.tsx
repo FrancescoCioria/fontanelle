@@ -6,6 +6,8 @@ import View from "react-flexview";
 import { Option, none, some, map } from "fp-ts/lib/Option";
 import getDrinkingWater, { DrinkingWaterNode } from "./getDrinkingWater";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
+import getPublicToilets, { PublicToiletsNode } from "./getPublicToilets";
+import PublicToiletsMarker from "./PublicToiletsMarker";
 
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./map.scss";
@@ -24,7 +26,13 @@ class MapFountains extends React.PureComponent<{}> {
 
   drinkingWaterMarkers: mapboxgl.Marker[] = [];
 
-  updateDrinkingWater = debounce(() => {
+  publicToiletsNodes: {
+    [id: string]: PublicToiletsNode;
+  } = {};
+
+  publicToiletsMarkers: mapboxgl.Marker[] = [];
+
+  updateDrinkingWater = () => {
     map<Map, void>(map => {
       getDrinkingWater({
         around: 2000,
@@ -32,7 +40,25 @@ class MapFountains extends React.PureComponent<{}> {
         lng: map.getCenter().lng
       }).then(this.addWaterMarkers);
     })(this.map);
-  }, 200);
+  };
+
+  updateDrinkingWaterDebounce = debounce(() => {
+    this.updateDrinkingWater();
+  }, 1000);
+
+  updatePublicToilets = () => {
+    map<Map, void>(map => {
+      getPublicToilets({
+        around: 2000,
+        lat: map.getCenter().lat,
+        lng: map.getCenter().lng
+      }).then(this.addPublicToiletsMarkers);
+    })(this.map);
+  };
+
+  updatePublicToiletsDebounce = debounce(() => {
+    this.updatePublicToilets();
+  }, 1000);
 
   initializeMap() {
     (mapboxgl as any).accessToken =
@@ -65,13 +91,17 @@ class MapFountains extends React.PureComponent<{}> {
           this.map = some(map);
 
           this.updateDrinkingWater();
+          this.updatePublicToilets();
 
           (
             document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
           )?.click();
         });
 
-        map.on("move", this.updateDrinkingWater);
+        map.on("move", () => {
+          this.updateDrinkingWaterDebounce();
+          this.updatePublicToiletsDebounce();
+        });
       });
     }
   }
@@ -92,6 +122,27 @@ class MapFountains extends React.PureComponent<{}> {
           this.drinkingWaterNodes[drinkingWaterNode.id] = drinkingWaterNode;
 
           this.drinkingWaterMarkers.push(marker);
+        }
+      });
+    })(this.map);
+  };
+
+  addPublicToiletsMarkers = (publicToiletsNodes: PublicToiletsNode[]) => {
+    map<Map, void>(map => {
+      publicToiletsNodes.forEach(publicToiletsNode => {
+        if (!this.publicToiletsNodes[publicToiletsNode.id]) {
+          const element = document.createElement("div");
+          ReactDOM.render(<PublicToiletsMarker />, element);
+
+          const marker: mapboxgl.Marker = new mapboxgl.Marker({
+            element
+          }).setLngLat([publicToiletsNode.lon, publicToiletsNode.lat]);
+
+          marker.addTo(map);
+
+          this.publicToiletsNodes[publicToiletsNode.id] = publicToiletsNode;
+
+          this.publicToiletsMarkers.push(marker);
         }
       });
     })(this.map);
