@@ -30,7 +30,7 @@ class MapFountains extends React.PureComponent<{}> {
   updateDrinkingWater = () => {
     map<mapboxgl.Map, void>(map => {
       getDrinkingWater({
-        around: 2000,
+        around: 4000,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       }).then(this.addWaterMarkers);
@@ -44,7 +44,7 @@ class MapFountains extends React.PureComponent<{}> {
   updatePublicToilets = () => {
     map<mapboxgl.Map, void>(map => {
       getPublicToilets({
-        around: 2000,
+        around: 4000,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       }).then(this.addPublicToiletsMarkers);
