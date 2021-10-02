@@ -3,10 +3,13 @@ import * as ReactDOM from "react-dom";
 import debounce from "lodash/debounce";
 import View from "react-flexview";
 import { Option, none, some, map } from "fp-ts/lib/Option";
-import getDrinkingWater, { DrinkingWaterNode } from "./getDrinkingWater";
+import { OpenStreetMapNode } from "./getOpenStreetMapAmenity";
+import getDrinkingWater from "./getDrinkingWater";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
-import getPublicToilets, { PublicToiletsNode } from "./getPublicToilets";
+import getPublicToilets from "./getPublicToilets";
 import PublicToiletsMarker from "./PublicToiletsMarker";
+import distance from "@turf/distance";
+import localforage from "localforage";
 
 import "./map.scss";
 
@@ -16,21 +19,27 @@ class MapFountains extends React.PureComponent<{}> {
   map: Option<mapboxgl.Map> = none;
 
   drinkingWaterNodes: {
-    [id: string]: DrinkingWaterNode;
+    [id: string]: OpenStreetMapNode;
   } = {};
 
   drinkingWaterMarkers: mapboxgl.Marker[] = [];
 
   publicToiletsNodes: {
-    [id: string]: PublicToiletsNode;
+    [id: string]: OpenStreetMapNode;
   } = {};
 
   publicToiletsMarkers: mapboxgl.Marker[] = [];
 
   updateDrinkingWater = () => {
     map<mapboxgl.Map, void>(map => {
+      localforage.getItem<OpenStreetMapNode[]>("drinking_water").then(items => {
+        if (items) {
+          this.addWaterMarkers(items);
+        }
+      });
+
       getDrinkingWater({
-        around: 4000,
+        around: 1000,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       }).then(this.addWaterMarkers);
@@ -43,8 +52,14 @@ class MapFountains extends React.PureComponent<{}> {
 
   updatePublicToilets = () => {
     map<mapboxgl.Map, void>(map => {
+      localforage.getItem<OpenStreetMapNode[]>("toilets").then(items => {
+        if (items) {
+          this.addPublicToiletsMarkers(items);
+        }
+      });
+
       getPublicToilets({
-        around: 4000,
+        around: 1000,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       }).then(this.addPublicToiletsMarkers);
@@ -82,6 +97,8 @@ class MapFountains extends React.PureComponent<{}> {
           })
         );
 
+        map.addControl(new mapboxgl.ScaleControl());
+
         map.on("load", () => {
           this.map = some(map);
 
@@ -101,46 +118,59 @@ class MapFountains extends React.PureComponent<{}> {
     }
   }
 
-  addWaterMarkers = (drinkingWaterNodes: DrinkingWaterNode[]) => {
+  addMarkers = (
+    nodes: OpenStreetMapNode[],
+    cacheMap: { [k: string]: OpenStreetMapNode },
+    markerElement: JSX.Element,
+    cachedMarkers: mapboxgl.Marker[]
+  ) => {
     map<mapboxgl.Map, void>(map => {
-      drinkingWaterNodes.forEach(drinkingWaterNode => {
-        if (!this.drinkingWaterNodes[drinkingWaterNode.id]) {
-          const element = document.createElement("div");
-          ReactDOM.render(<DrinkingWaterMarker />, element);
+      const lat = map.getCenter().lat;
+      const lng = map.getCenter().lng;
 
-          const marker: mapboxgl.Marker = new mapboxgl.Marker({
-            element
-          }).setLngLat([drinkingWaterNode.lon, drinkingWaterNode.lat]);
+      nodes
+        .filter(node => {
+          const distanceInKm = distance([lat, lng], [node.lat, node.lon], {
+            units: "kilometers"
+          });
 
-          marker.addTo(map);
+          return distanceInKm < 2;
+        })
+        .forEach(node => {
+          if (!cacheMap[node.id]) {
+            const element = document.createElement("div");
+            ReactDOM.render(markerElement, element);
 
-          this.drinkingWaterNodes[drinkingWaterNode.id] = drinkingWaterNode;
+            const marker: mapboxgl.Marker = new mapboxgl.Marker({
+              element
+            }).setLngLat([node.lon, node.lat]);
 
-          this.drinkingWaterMarkers.push(marker);
-        }
-      });
+            marker.addTo(map);
+
+            cacheMap[node.id] = node;
+
+            cachedMarkers.push(marker);
+          }
+        });
     })(this.map);
   };
 
-  addPublicToiletsMarkers = (publicToiletsNodes: PublicToiletsNode[]) => {
-    map<mapboxgl.Map, void>(map => {
-      publicToiletsNodes.forEach(publicToiletsNode => {
-        if (!this.publicToiletsNodes[publicToiletsNode.id]) {
-          const element = document.createElement("div");
-          ReactDOM.render(<PublicToiletsMarker />, element);
+  addWaterMarkers = (drinkingWaterNodes: OpenStreetMapNode[]) => {
+    this.addMarkers(
+      drinkingWaterNodes,
+      this.drinkingWaterNodes,
+      <DrinkingWaterMarker />,
+      this.drinkingWaterMarkers
+    );
+  };
 
-          const marker: mapboxgl.Marker = new mapboxgl.Marker({
-            element
-          }).setLngLat([publicToiletsNode.lon, publicToiletsNode.lat]);
-
-          marker.addTo(map);
-
-          this.publicToiletsNodes[publicToiletsNode.id] = publicToiletsNode;
-
-          this.publicToiletsMarkers.push(marker);
-        }
-      });
-    })(this.map);
+  addPublicToiletsMarkers = (publicToiletsNodes: OpenStreetMapNode[]) => {
+    this.addMarkers(
+      publicToiletsNodes,
+      this.publicToiletsNodes,
+      <PublicToiletsMarker />,
+      this.publicToiletsMarkers
+    );
   };
 
   componentDidMount() {
