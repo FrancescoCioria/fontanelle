@@ -4,7 +4,12 @@ import uniqBy from "lodash/uniqBy";
 
 import "localforage-getitems";
 
-export type OpenStreetMapNode = { id: number; lat: number; lon: number };
+export type OpenStreetMapNode = {
+  id: number;
+  lat: number;
+  lon: number;
+  tags: { [k: string]: string };
+};
 export type Options = {
   amenity: "drinking_water" | "toilets";
   around: number;

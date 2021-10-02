@@ -121,7 +121,7 @@ class MapFountains extends React.PureComponent<{}> {
   addMarkers = (
     nodes: OpenStreetMapNode[],
     cacheMap: { [k: string]: OpenStreetMapNode },
-    markerElement: JSX.Element,
+    markerElement: (node: OpenStreetMapNode) => JSX.Element,
     cachedMarkers: mapboxgl.Marker[]
   ) => {
     map<mapboxgl.Map, void>(map => {
@@ -139,11 +139,32 @@ class MapFountains extends React.PureComponent<{}> {
         .forEach(node => {
           if (!cacheMap[node.id]) {
             const element = document.createElement("div");
-            ReactDOM.render(markerElement, element);
+            ReactDOM.render(markerElement(node), element);
 
             const marker: mapboxgl.Marker = new mapboxgl.Marker({
               element
             }).setLngLat([node.lon, node.lat]);
+
+            const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+              `<div style="overflow-wrap: break-word;">
+                ${Object.keys(node.tags)
+                  .map(k => `<b>${k}:</b> ${node.tags[k]}`)
+                  .join("<br />")}
+
+                ${
+                  node.tags.mapillary
+                    ? `<button style="margin-top: 16px;">
+                        <a href="${node.tags.mapillary}" target="_blank" rel="noopener noreferrer">
+                          See street view
+                        </a>
+                      </button>`
+                    : ""
+                }
+              </div>
+              `
+            );
+
+            marker.setPopup(popup);
 
             marker.addTo(map);
 
@@ -159,7 +180,7 @@ class MapFountains extends React.PureComponent<{}> {
     this.addMarkers(
       drinkingWaterNodes,
       this.drinkingWaterNodes,
-      <DrinkingWaterMarker />,
+      () => <DrinkingWaterMarker />,
       this.drinkingWaterMarkers
     );
   };
@@ -168,7 +189,15 @@ class MapFountains extends React.PureComponent<{}> {
     this.addMarkers(
       publicToiletsNodes,
       this.publicToiletsNodes,
-      <PublicToiletsMarker />,
+      (node: OpenStreetMapNode) => (
+        <PublicToiletsMarker
+          color={
+            typeof node.tags.fee === "string" && node.tags.fee !== "no"
+              ? "gold"
+              : "white"
+          }
+        />
+      ),
       this.publicToiletsMarkers
     );
   };
