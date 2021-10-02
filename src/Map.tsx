@@ -1,7 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import debounce from "lodash/debounce";
-import { Map } from "mapbox-gl";
 import View from "react-flexview";
 import { Option, none, some, map } from "fp-ts/lib/Option";
 import getDrinkingWater, { DrinkingWaterNode } from "./getDrinkingWater";
@@ -14,7 +13,7 @@ import "./map.scss";
 const mapboxgl = window.mapboxgl;
 
 class MapFountains extends React.PureComponent<{}> {
-  map: Option<Map> = none;
+  map: Option<mapboxgl.Map> = none;
 
   drinkingWaterNodes: {
     [id: string]: DrinkingWaterNode;
@@ -29,7 +28,7 @@ class MapFountains extends React.PureComponent<{}> {
   publicToiletsMarkers: mapboxgl.Marker[] = [];
 
   updateDrinkingWater = () => {
-    map<Map, void>(map => {
+    map<mapboxgl.Map, void>(map => {
       getDrinkingWater({
         around: 2000,
         lat: map.getCenter().lat,
@@ -43,7 +42,7 @@ class MapFountains extends React.PureComponent<{}> {
   }, 1000);
 
   updatePublicToilets = () => {
-    map<Map, void>(map => {
+    map<mapboxgl.Map, void>(map => {
       getPublicToilets({
         around: 2000,
         lat: map.getCenter().lat,
@@ -62,7 +61,7 @@ class MapFountains extends React.PureComponent<{}> {
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(e => {
-        const map: Map = new mapboxgl.Map({
+        const map = new mapboxgl.Map({
           container: "map",
           style:
             "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
@@ -103,7 +102,7 @@ class MapFountains extends React.PureComponent<{}> {
   }
 
   addWaterMarkers = (drinkingWaterNodes: DrinkingWaterNode[]) => {
-    map<Map, void>(map => {
+    map<mapboxgl.Map, void>(map => {
       drinkingWaterNodes.forEach(drinkingWaterNode => {
         if (!this.drinkingWaterNodes[drinkingWaterNode.id]) {
           const element = document.createElement("div");
@@ -124,7 +123,7 @@ class MapFountains extends React.PureComponent<{}> {
   };
 
   addPublicToiletsMarkers = (publicToiletsNodes: PublicToiletsNode[]) => {
-    map<Map, void>(map => {
+    map<mapboxgl.Map, void>(map => {
       publicToiletsNodes.forEach(publicToiletsNode => {
         if (!this.publicToiletsNodes[publicToiletsNode.id]) {
           const element = document.createElement("div");
@@ -150,7 +149,7 @@ class MapFountains extends React.PureComponent<{}> {
 
   componentDidUpdate() {
     requestAnimationFrame(() => {
-      map<Map, void>(map => map.resize())(this.map);
+      map<mapboxgl.Map, void>(map => map.resize())(this.map);
     });
   }
 
