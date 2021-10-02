@@ -1,3 +1,5 @@
+import roundGeoCoordinate from "./roundGeoCoordinate";
+
 export type DrinkingWaterNode = { id: number; lat: number; lon: number };
 
 export default async (options: {
@@ -5,9 +7,8 @@ export default async (options: {
   lat: number;
   lng: number;
 }): Promise<DrinkingWaterNode[]> => {
-  // round to second decimal (ex: 45.537 -> 45.54; 45.4923 -> 45.49)
-  const roundedLat = Math.round(options.lat * 100) / 100;
-  const roundedLng = Math.round(options.lng * 100) / 100;
+  const roundedLat = roundGeoCoordinate(options.lat);
+  const roundedLng = roundGeoCoordinate(options.lng);
 
   const formData = `
     [out:json];

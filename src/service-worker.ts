@@ -105,11 +105,11 @@ registerRoute(
   ({ url }) => {
     return (
       url.origin === "https://api.mapbox.com" &&
-      url.pathname === "/styles/v1/francescocioria/cjqi3u6lmame92rmw6aw3uyhm"
+      !url.pathname.includes("vector.pbf")
     );
   },
   new CacheFirst({
-    cacheName: "mapbox-styles",
+    cacheName: "mapbox-generic",
     plugins: [
       new ExpirationPlugin({
         // Only cache requests for a week
