@@ -9,13 +9,9 @@ import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import getPublicToilets, { PublicToiletsNode } from "./getPublicToilets";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 
-import "mapbox-gl/dist/mapbox-gl.css";
 import "./map.scss";
 
-const mapboxgl = require("mapbox-gl/dist/mapbox-gl-csp");
-
-mapboxgl.workerClass =
-  require("worker-loader!mapbox-gl/dist/mapbox-gl-csp-worker").default;
+const mapboxgl = window.mapboxgl;
 
 class MapFountains extends React.PureComponent<{}> {
   map: Option<Map> = none;
@@ -61,7 +57,7 @@ class MapFountains extends React.PureComponent<{}> {
   }, 1000);
 
   initializeMap() {
-    (mapboxgl as any).accessToken =
+    mapboxgl.accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
 
     if (navigator.geolocation) {
