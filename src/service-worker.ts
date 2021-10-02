@@ -98,7 +98,8 @@ registerRoute(
         statuses: [0, 200]
       })
     ]
-  })
+  }),
+  "GET"
 );
 
 registerRoute(
@@ -123,21 +124,49 @@ registerRoute(
       ignoreSearch: true,
       ignoreVary: true
     }
-  })
+  }),
+  "GET"
 );
 
-self.addEventListener("fetch", event => {
-  // return GET requests "cache-first"
-  event.respondWith(
-    caches.open("mapbox-tiles").then(cache =>
-      cache
-        .match(event.request.url, {
-          ignoreSearch: true,
-          ignoreVary: true
-        })
-        .then(cachedResponse => {
-          return cachedResponse || fetch(event.request);
-        })
-    )
-  );
-});
+registerRoute(
+  ({ url }) => {
+    return (
+      url.origin === "https://api.mapbox.com" &&
+      url.pathname.includes("vector.pbf")
+    );
+  },
+  new CacheFirst({
+    cacheName: "mapbox-tiles",
+    plugins: [
+      new ExpirationPlugin({
+        // Only cache requests for a week
+        maxAgeSeconds: 7 * 24 * 60 * 60
+      }),
+      new CacheableResponsePlugin({
+        statuses: [0, 200]
+      })
+    ],
+    matchOptions: {
+      ignoreSearch: true,
+      ignoreVary: true
+    }
+  }),
+  "GET"
+);
+
+// self.addEventListener("fetch", event => {
+//   // return GET requests "cache-first"
+//   event.respondWith(
+//     caches.open("mapbox-tiles").then(cache =>
+//       cache
+//         .match(event.request.url, {
+//           ignoreSearch: true,
+//           ignoreVary: true
+//         })
+//         .then(cachedResponse => {
+//           console.log(event.request.url, cachedResponse);
+//           return cachedResponse || fetch(event.request);
+//         })
+//     )
+//   );
+// });
