@@ -85,7 +85,10 @@ self.addEventListener("message", event => {
 
 registerRoute(
   ({ url }) => {
-    return url.origin === "https://overpass-api.de";
+    return (
+      url.origin === "https://overpass-api.de" ||
+      url.origin === "overpass.kumi.systems"
+    );
   },
   new CacheFirst({
     cacheName: "overpass-api",
