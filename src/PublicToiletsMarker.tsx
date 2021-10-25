@@ -2,10 +2,6 @@ import * as React from "react";
 
 export default (props: { color?: string }) => (
   <svg
-    version="1.1"
-    id="Capa_1"
-    x="0px"
-    y="0px"
     width="20px"
     height="20px"
     viewBox="0 0 395 395"
