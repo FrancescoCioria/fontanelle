@@ -104,7 +104,7 @@ registerRoute(
 
 registerRoute(
   ({ url }) => {
-    return url.origin === "overpass.kumi.systems";
+    return url.origin === "https://overpass.kumi.systems";
   },
   new CacheFirst({
     cacheName: "overpass-api-kumi",
