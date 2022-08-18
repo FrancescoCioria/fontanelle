@@ -18,6 +18,7 @@
     "localforage": "^1.10.0",
     "localforage-getitems": "^1.4.2",
     "lodash": "^4.17.21",
+    "mapbox-gl": "^2.9.2",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-flexview": "^6.0.1",
