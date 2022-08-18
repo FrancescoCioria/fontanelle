@@ -10,10 +10,10 @@ import getPublicToilets from "./getPublicToilets";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 import distance from "@turf/distance";
 import localforage from "localforage";
-import mapboxgl from "mapbox-gl";
 
-import "mapbox-gl/dist/mapbox-gl.css";
 import "./map.scss";
+
+const mapboxgl = window.mapboxgl;
 
 class MapFountains extends React.PureComponent<{}> {
   map: Option<mapboxgl.Map> = none;
