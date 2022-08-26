@@ -72,7 +72,12 @@ class MapFountains extends React.PureComponent<{}> {
             lng: e.coords.longitude
           },
           zoom: 15.0,
-          scrollZoom: false
+          scrollZoom:
+            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+              navigator.userAgent
+            )
+              ? false
+              : true
         });
 
         map.addControl(
