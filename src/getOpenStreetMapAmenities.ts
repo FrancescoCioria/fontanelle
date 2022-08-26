@@ -11,7 +11,7 @@ export type OpenStreetMapNode = {
   tags: { [k: string]: string; amenity: Amenity };
 };
 
-const amenities = ["drinking_water", "toilets"] as const;
+const amenities = ["drinking_water", "toilets", "shower"] as const;
 
 export type Amenity = typeof amenities[number];
 

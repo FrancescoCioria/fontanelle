@@ -8,6 +8,7 @@ import getOpenStreetMapAmenities, {
 } from "./getOpenStreetMapAmenities";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
+import PublicShowerMarker from "./PublicShowerMarker";
 import distance from "@turf/distance";
 import localforage from "localforage";
 
@@ -29,6 +30,12 @@ class MapFountains extends React.PureComponent<{}> {
   } = {};
 
   publicToiletsMarkers: mapboxgl.Marker[] = [];
+
+  publicShowersNodes: {
+    [id: string]: OpenStreetMapNode;
+  } = {};
+
+  publicShowersMarkers: mapboxgl.Marker[] = [];
 
   updateAmenities = () => {
     map<mapboxgl.Map, void>(map => {
@@ -177,6 +184,14 @@ class MapFountains extends React.PureComponent<{}> {
         />
       ),
       this.publicToiletsMarkers
+    );
+
+    // public showers
+    this.addMarkers(
+      nodes.filter(node => node.tags.amenity === "shower"),
+      this.publicShowersNodes,
+      (node: OpenStreetMapNode) => <PublicShowerMarker />,
+      this.publicShowersMarkers
     );
   };
 
