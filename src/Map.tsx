@@ -145,6 +145,16 @@ class MapFountains extends React.PureComponent<{}> {
                       </button>`
                     : ""
                 }
+
+                <div>
+                  <button style="margin-top: 16px;">
+                    <a href="https://www.openstreetmap.org/edit?node=${
+                      node.id
+                    }" target="_blank" rel="noopener noreferrer">
+                      Edit node
+                    </a>
+                  </button>
+                </div>
               </div>
               `
             );
