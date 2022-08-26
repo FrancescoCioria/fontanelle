@@ -8,10 +8,14 @@ export type OpenStreetMapNode = {
   id: number;
   lat: number;
   lon: number;
-  tags: { [k: string]: string };
+  tags: { [k: string]: string; amenity: Amenity };
 };
+
+const amenities = ["drinking_water", "toilets"] as const;
+
+export type Amenity = typeof amenities[number];
+
 export type Options = {
-  amenity: "drinking_water" | "toilets";
   around: number;
   lat: number;
   lng: number;
@@ -23,7 +27,9 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
 
   const formData = `
     [out:json];
-    (node["amenity"="${options.amenity}"](around:${options.around},${roundedLat},${roundedLng}););
+    (node["amenity"~"${amenities.join("|")}"](around:${
+    options.around
+  },${roundedLat},${roundedLng}););
     out;>;out;
   `;
 
@@ -35,12 +41,12 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   const json: { elements: OpenStreetMapNode[] } = await res.json();
 
   const cachedItems =
-    (await localforage.getItem<OpenStreetMapNode[]>(options.amenity)) || [];
+    (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
 
   const nodes = uniqBy(cachedItems.concat(json.elements), i => i.id);
 
   // fire&forget
-  localforage.setItem(options.amenity, nodes);
+  localforage.setItem("amenities", nodes);
 
   return nodes;
 };

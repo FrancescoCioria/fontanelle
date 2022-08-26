@@ -3,10 +3,10 @@ import * as ReactDOM from "react-dom";
 import debounce from "lodash/debounce";
 import View from "react-flexview";
 import { Option, none, some, map } from "fp-ts/lib/Option";
-import { OpenStreetMapNode } from "./getOpenStreetMapAmenity";
-import getDrinkingWater from "./getDrinkingWater";
+import getOpenStreetMapAmenities, {
+  OpenStreetMapNode
+} from "./getOpenStreetMapAmenities";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
-import getPublicToilets from "./getPublicToilets";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 import distance from "@turf/distance";
 import localforage from "localforage";
@@ -30,44 +30,24 @@ class MapFountains extends React.PureComponent<{}> {
 
   publicToiletsMarkers: mapboxgl.Marker[] = [];
 
-  updateDrinkingWater = () => {
+  updateAmenities = () => {
     map<mapboxgl.Map, void>(map => {
-      localforage.getItem<OpenStreetMapNode[]>("drinking_water").then(items => {
+      localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
         if (items) {
-          this.addWaterMarkers(items);
+          this.addAmenitiesMarkers(items);
         }
       });
 
-      getDrinkingWater({
+      getOpenStreetMapAmenities({
         around: 1000,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
-      }).then(this.addWaterMarkers);
+      }).then(this.addAmenitiesMarkers);
     })(this.map);
   };
 
-  updateDrinkingWaterDebounce = debounce(() => {
-    this.updateDrinkingWater();
-  }, 1000);
-
-  updatePublicToilets = () => {
-    map<mapboxgl.Map, void>(map => {
-      localforage.getItem<OpenStreetMapNode[]>("toilets").then(items => {
-        if (items) {
-          this.addPublicToiletsMarkers(items);
-        }
-      });
-
-      getPublicToilets({
-        around: 1000,
-        lat: map.getCenter().lat,
-        lng: map.getCenter().lng
-      }).then(this.addPublicToiletsMarkers);
-    })(this.map);
-  };
-
-  updatePublicToiletsDebounce = debounce(() => {
-    this.updatePublicToilets();
+  updateAmenitiesDebounce = debounce(() => {
+    this.updateAmenities();
   }, 1000);
 
   initializeMap() {
@@ -102,8 +82,7 @@ class MapFountains extends React.PureComponent<{}> {
         map.on("load", () => {
           this.map = some(map);
 
-          this.updateDrinkingWater();
-          this.updatePublicToilets();
+          this.updateAmenities();
 
           (
             document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
@@ -111,8 +90,7 @@ class MapFountains extends React.PureComponent<{}> {
         });
 
         map.on("move", () => {
-          this.updateDrinkingWaterDebounce();
-          this.updatePublicToiletsDebounce();
+          this.updateAmenitiesDebounce();
         });
       });
     }
@@ -176,18 +154,18 @@ class MapFountains extends React.PureComponent<{}> {
     })(this.map);
   };
 
-  addWaterMarkers = (drinkingWaterNodes: OpenStreetMapNode[]) => {
+  addAmenitiesMarkers = (nodes: OpenStreetMapNode[]) => {
+    // drinking_water
     this.addMarkers(
-      drinkingWaterNodes,
+      nodes.filter(node => node.tags.amenity === "drinking_water"),
       this.drinkingWaterNodes,
       () => <DrinkingWaterMarker />,
       this.drinkingWaterMarkers
     );
-  };
 
-  addPublicToiletsMarkers = (publicToiletsNodes: OpenStreetMapNode[]) => {
+    // toilets
     this.addMarkers(
-      publicToiletsNodes,
+      nodes.filter(node => node.tags.amenity === "toilets"),
       this.publicToiletsNodes,
       (node: OpenStreetMapNode) => (
         <PublicToiletsMarker
