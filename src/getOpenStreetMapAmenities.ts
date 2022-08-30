@@ -1,4 +1,3 @@
-import roundGeoCoordinate from "./roundGeoCoordinate";
 import * as localforage from "localforage";
 import uniqBy from "lodash/uniqBy";
 
@@ -22,14 +21,11 @@ export type Options = {
 };
 
 export default async (options: Options): Promise<OpenStreetMapNode[]> => {
-  const roundedLat = roundGeoCoordinate(options.lat);
-  const roundedLng = roundGeoCoordinate(options.lng);
-
   const formData = `
     [out:json];
-    (node["amenity"~"${amenities.join("|")}"](around:${
-    options.around
-  },${roundedLat},${roundedLng}););
+    (node["amenity"~"${amenities.join("|")}"](around:${options.around},${
+    options.lat
+  },${options.lng}););
     out;>;out;
   `;
 
@@ -48,5 +44,5 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   // fire&forget
   localforage.setItem("amenities", nodes);
 
-  return nodes;
+  return json.elements;
 };

@@ -92,43 +92,43 @@ self.addEventListener("message", event => {
 
 // Any other custom service worker logic can go here.
 
-registerRoute(
-  ({ url }) => {
-    return url.origin === "https://overpass-api.de";
-  },
-  new CacheFirst({
-    cacheName: "overpass-api",
-    plugins: [
-      new ExpirationPlugin({
-        // Only cache requests for a week
-        maxAgeSeconds: 7 * 24 * 60 * 60
-      }),
-      new CacheableResponsePlugin({
-        statuses: [0, 200]
-      })
-    ]
-  }),
-  "GET"
-);
+// registerRoute(
+//   ({ url }) => {
+//     return url.origin === "https://overpass-api.de";
+//   },
+//   new CacheFirst({
+//     cacheName: "overpass-api",
+//     plugins: [
+//       new ExpirationPlugin({
+//         // Only cache requests for a week
+//         maxAgeSeconds: 7 * 24 * 60 * 60
+//       }),
+//       new CacheableResponsePlugin({
+//         statuses: [0, 200]
+//       })
+//     ]
+//   }),
+//   "GET"
+// );
 
-registerRoute(
-  ({ url }) => {
-    return url.origin === "https://overpass.kumi.systems";
-  },
-  new CacheFirst({
-    cacheName: "overpass-api-kumi",
-    plugins: [
-      new ExpirationPlugin({
-        // Only cache requests for a week
-        maxAgeSeconds: 7 * 24 * 60 * 60
-      }),
-      new CacheableResponsePlugin({
-        statuses: [0, 200]
-      })
-    ]
-  }),
-  "GET"
-);
+// registerRoute(
+//   ({ url }) => {
+//     return url.origin === "https://overpass.kumi.systems";
+//   },
+//   new CacheFirst({
+//     cacheName: "overpass-api-kumi",
+//     plugins: [
+//       new ExpirationPlugin({
+//         // Only cache requests for a week
+//         maxAgeSeconds: 7 * 24 * 60 * 60
+//       }),
+//       new CacheableResponsePlugin({
+//         statuses: [0, 200]
+//       })
+//     ]
+//   }),
+//   "GET"
+// );
 
 registerRoute(
   ({ url }) => {

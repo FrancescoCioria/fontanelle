@@ -15,7 +15,6 @@ import MenuIcon from "./MenuIcon";
 import * as MapboxCircle from "mapbox-gl-circle";
 
 import "./map.scss";
-import roundGeoCoordinate from "./roundGeoCoordinate";
 
 const mapboxgl = window.mapboxgl;
 
@@ -64,7 +63,20 @@ class MapFountains extends React.PureComponent<{}, State> {
     map<mapboxgl.Map, void>(map => {
       localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
         if (items) {
-          this.addAmenitiesMarkers(items);
+          this.addAmenitiesMarkers(
+            // add cached nodes contained in the circle radius
+            items.filter(node => {
+              const distanceInMeters = distance(
+                [map.getCenter().lat, map.getCenter().lng],
+                [node.lat, node.lon],
+                {
+                  units: "meters"
+                }
+              );
+
+              return distanceInMeters < this.state.around;
+            })
+          );
         }
       });
 
@@ -144,29 +156,17 @@ class MapFountains extends React.PureComponent<{}, State> {
     show: boolean
   ) => {
     map<mapboxgl.Map, void>(map => {
-      nodes
-        .filter(node => {
-          const distanceInMeters = distance(
-            [map.getCenter().lat, map.getCenter().lng],
-            [node.lat, node.lon],
-            {
-              units: "meters"
-            }
-          );
+      nodes.forEach(node => {
+        if (!cacheMap[node.id]) {
+          const element = document.createElement("div");
+          ReactDOM.render(markerElement(node), element);
 
-          return distanceInMeters < this.state.around * 1.3;
-        })
-        .forEach(node => {
-          if (!cacheMap[node.id]) {
-            const element = document.createElement("div");
-            ReactDOM.render(markerElement(node), element);
+          const marker: mapboxgl.Marker = new mapboxgl.Marker({
+            element
+          }).setLngLat([node.lon, node.lat]);
 
-            const marker: mapboxgl.Marker = new mapboxgl.Marker({
-              element
-            }).setLngLat([node.lon, node.lat]);
-
-            const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-              `<div style="overflow-wrap: break-word;">
+          const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<div style="overflow-wrap: break-word;">
                 ${Object.keys(node.tags)
                   .map(k => `<b>${k}:</b> ${node.tags[k]}`)
                   .join("<br />")}
@@ -192,19 +192,19 @@ class MapFountains extends React.PureComponent<{}, State> {
                 </div>
               </div>
               `
-            );
+          );
 
-            marker.setPopup(popup);
+          marker.setPopup(popup);
 
-            if (show) {
-              marker.addTo(map);
-            }
-
-            cacheMap[node.id] = node;
-
-            cachedMarkers.push(marker);
+          if (show) {
+            marker.addTo(map);
           }
-        });
+
+          cacheMap[node.id] = node;
+
+          cachedMarkers.push(marker);
+        }
+      });
     })(this.map);
   };
 
@@ -248,8 +248,8 @@ class MapFountains extends React.PureComponent<{}, State> {
   showRadius() {
     map<mapboxgl.Map, void>(map => {
       const center = {
-        lat: roundGeoCoordinate(map.getCenter().lat),
-        lng: roundGeoCoordinate(map.getCenter().lng)
+        lat: map.getCenter().lat,
+        lng: map.getCenter().lng
       };
 
       if (this.circleRadius) {
