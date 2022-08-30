@@ -2,7 +2,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import debounce from "lodash/debounce";
 import View from "react-flexview";
-import { Option, none, some, map } from "fp-ts/lib/Option";
+import { Option, none, some, map, isSome } from "fp-ts/lib/Option";
 import getOpenStreetMapAmenities, {
   OpenStreetMapNode
 } from "./getOpenStreetMapAmenities";
@@ -11,13 +11,36 @@ import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
 import distance from "@turf/distance";
 import localforage from "localforage";
+import MenuIcon from "./MenuIcon";
+import * as MapboxCircle from "mapbox-gl-circle";
 
 import "./map.scss";
+import roundGeoCoordinate from "./roundGeoCoordinate";
 
 const mapboxgl = window.mapboxgl;
 
-class MapFountains extends React.PureComponent<{}> {
+type State = {
+  isMenuOpen: boolean;
+  around: number;
+  showRadius: boolean;
+  showDrinkingWater: boolean;
+  showToilets: boolean;
+  showShowers: boolean;
+};
+
+class MapFountains extends React.PureComponent<{}, State> {
+  state: State = {
+    isMenuOpen: false,
+    around: 0,
+    showRadius: false,
+    showDrinkingWater: true,
+    showShowers: true,
+    showToilets: true
+  };
+
   map: Option<mapboxgl.Map> = none;
+
+  circleRadius: any | null = null;
 
   drinkingWaterNodes: {
     [id: string]: OpenStreetMapNode;
@@ -46,7 +69,7 @@ class MapFountains extends React.PureComponent<{}> {
       });
 
       getOpenStreetMapAmenities({
-        around: 1000,
+        around: this.state.around,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       }).then(this.addAmenitiesMarkers);
@@ -86,7 +109,8 @@ class MapFountains extends React.PureComponent<{}> {
               enableHighAccuracy: true
             },
             trackUserLocation: true
-          })
+          }),
+          "bottom-right"
         );
 
         map.addControl(new mapboxgl.ScaleControl());
@@ -103,6 +127,10 @@ class MapFountains extends React.PureComponent<{}> {
 
         map.on("move", () => {
           this.updateAmenitiesDebounce();
+
+          if (this.state.showRadius) {
+            this.showRadius();
+          }
         });
       });
     }
@@ -112,19 +140,21 @@ class MapFountains extends React.PureComponent<{}> {
     nodes: OpenStreetMapNode[],
     cacheMap: { [k: string]: OpenStreetMapNode },
     markerElement: (node: OpenStreetMapNode) => JSX.Element,
-    cachedMarkers: mapboxgl.Marker[]
+    cachedMarkers: mapboxgl.Marker[],
+    show: boolean
   ) => {
     map<mapboxgl.Map, void>(map => {
-      const lat = map.getCenter().lat;
-      const lng = map.getCenter().lng;
-
       nodes
         .filter(node => {
-          const distanceInKm = distance([lat, lng], [node.lat, node.lon], {
-            units: "kilometers"
-          });
+          const distanceInMeters = distance(
+            [map.getCenter().lat, map.getCenter().lng],
+            [node.lat, node.lon],
+            {
+              units: "meters"
+            }
+          );
 
-          return distanceInKm < 2;
+          return distanceInMeters < this.state.around * 1.3;
         })
         .forEach(node => {
           if (!cacheMap[node.id]) {
@@ -166,7 +196,9 @@ class MapFountains extends React.PureComponent<{}> {
 
             marker.setPopup(popup);
 
-            marker.addTo(map);
+            if (show) {
+              marker.addTo(map);
+            }
 
             cacheMap[node.id] = node;
 
@@ -182,7 +214,8 @@ class MapFountains extends React.PureComponent<{}> {
       nodes.filter(node => node.tags.amenity === "drinking_water"),
       this.drinkingWaterNodes,
       () => <DrinkingWaterMarker />,
-      this.drinkingWaterMarkers
+      this.drinkingWaterMarkers,
+      this.state.showDrinkingWater
     );
 
     // toilets
@@ -198,19 +231,62 @@ class MapFountains extends React.PureComponent<{}> {
           }
         />
       ),
-      this.publicToiletsMarkers
+      this.publicToiletsMarkers,
+      this.state.showToilets
     );
 
     // public showers
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "shower"),
       this.publicShowersNodes,
-      (node: OpenStreetMapNode) => <PublicShowerMarker />,
-      this.publicShowersMarkers
+      () => <PublicShowerMarker />,
+      this.publicShowersMarkers,
+      this.state.showShowers
     );
   };
 
+  showRadius() {
+    map<mapboxgl.Map, void>(map => {
+      const center = {
+        lat: roundGeoCoordinate(map.getCenter().lat),
+        lng: roundGeoCoordinate(map.getCenter().lng)
+      };
+
+      if (this.circleRadius) {
+        this.circleRadius.setCenter(center);
+
+        this.circleRadius.setRadius(this.state.around);
+      } else {
+        this.circleRadius = new MapboxCircle(center, this.state.around, {
+          editable: false,
+          minRadius: 0,
+          fillColor: "#29AB87"
+        }).addTo(map);
+      }
+    })(this.map);
+  }
+
+  hideRadius() {
+    this.circleRadius.remove();
+    this.circleRadius = null;
+  }
+
   componentDidMount() {
+    // initialize "around" radius
+    localforage
+      .getItem<number>("around")
+      .then(around => this.setState({ around: around || 1000 }));
+
+    // initialize "showRadius" option
+    localforage.getItem<boolean>("showRadius").then(showRadius => {
+      this.setState({ showRadius: showRadius === null ? true : showRadius });
+
+      if (showRadius) {
+        this.showRadius();
+      }
+    });
+
+    // initialize map
     this.initializeMap();
   }
 
@@ -221,7 +297,156 @@ class MapFountains extends React.PureComponent<{}> {
   }
 
   render() {
-    return <View grow id="map" />;
+    return (
+      <View style={{ height: "100%", width: "100%" }} column>
+        <View grow id="map" />
+
+        <View
+          style={{
+            position: "absolute",
+            top: 30,
+            right: 8,
+            zIndex: 9999999,
+            background: "white",
+            borderRadius: 4,
+            width: 30,
+            height: 30,
+            border: "2px solid #969492",
+            cursor: "pointer"
+          }}
+          hAlignContent="center"
+          vAlignContent="center"
+        >
+          <View onClick={() => this.setState({ isMenuOpen: true })}>
+            <MenuIcon />
+          </View>
+
+          {/* popup */}
+          <View
+            className="menu-popup"
+            style={{
+              display: this.state.isMenuOpen ? "flex" : "none"
+            }}
+            hAlignContent="center"
+            vAlignContent="center"
+            onClick={() => this.setState({ isMenuOpen: false })}
+          >
+            <View
+              className="menu-popup-content"
+              vAlignContent="center"
+              column
+              onClick={e => {
+                e.stopPropagation();
+              }}
+            >
+              <span className="menu-item-label">Around radius (in meters)</span>
+              <input
+                value={this.state.around}
+                type="number"
+                onChange={e => {
+                  const around = parseInt(e.currentTarget.value) || 1000;
+
+                  this.setState({ around });
+                  localforage.setItem("around", around);
+                }}
+              />
+
+              <View className="checkbox" vAlignContent="center">
+                <input
+                  checked={this.state.showRadius}
+                  type="checkbox"
+                  onChange={e => {
+                    const showRadius = e.currentTarget.checked;
+
+                    this.setState({ showRadius });
+                    localforage.setItem("showRadius", showRadius);
+
+                    if (showRadius) {
+                      this.showRadius();
+                    } else {
+                      this.hideRadius();
+                    }
+                  }}
+                />
+                <span className="menu-item-label">Show radius in map</span>
+              </View>
+
+              <View className="checkbox" vAlignContent="center">
+                <input
+                  checked={this.state.showDrinkingWater}
+                  type="checkbox"
+                  onChange={e => {
+                    const showDrinkingWater = e.currentTarget.checked;
+                    this.setState({ showDrinkingWater });
+
+                    map<mapboxgl.Map, void>(map => {
+                      if (showDrinkingWater) {
+                        this.drinkingWaterMarkers.forEach(marker =>
+                          marker.addTo(map)
+                        );
+                      } else {
+                        this.drinkingWaterMarkers.forEach(marker =>
+                          marker.remove()
+                        );
+                      }
+                    })(this.map);
+                  }}
+                />
+                <span className="menu-item-label">Show "drinking water"</span>
+              </View>
+
+              <View className="checkbox" vAlignContent="center">
+                <input
+                  checked={this.state.showToilets}
+                  type="checkbox"
+                  onChange={e => {
+                    const showToilets = e.currentTarget.checked;
+                    this.setState({ showToilets });
+
+                    map<mapboxgl.Map, void>(map => {
+                      if (showToilets) {
+                        this.publicToiletsMarkers.forEach(marker =>
+                          marker.addTo(map)
+                        );
+                      } else {
+                        this.publicToiletsMarkers.forEach(marker =>
+                          marker.remove()
+                        );
+                      }
+                    })(this.map);
+                  }}
+                />
+                <span className="menu-item-label">Show "toilets"</span>
+              </View>
+
+              <View className="checkbox" vAlignContent="center">
+                <input
+                  checked={this.state.showShowers}
+                  type="checkbox"
+                  onChange={e => {
+                    const showShowers = e.currentTarget.checked;
+                    this.setState({ showShowers });
+
+                    map<mapboxgl.Map, void>(map => {
+                      if (showShowers) {
+                        this.publicShowersMarkers.forEach(marker =>
+                          marker.addTo(map)
+                        );
+                      } else {
+                        this.publicShowersMarkers.forEach(marker =>
+                          marker.remove()
+                        );
+                      }
+                    })(this.map);
+                  }}
+                />
+                <span className="menu-item-label">Show "showers"</span>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
   }
 }
 

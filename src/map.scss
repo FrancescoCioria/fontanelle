@@ -7,3 +7,41 @@
     position: static;
   }
 }
+
+.menu-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+
+  .menu-popup-content {
+    background: white;
+    border-radius: 4px;
+    padding: 24px;
+    width: 70vw;
+
+    .menu-item-label {
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    .checkbox {
+      margin-top: 24px;
+      margin-bottom: 8px;
+
+      input {
+        width: 14px;
+        height: 14px;
+        margin: 0;
+      }
+
+      .menu-item-label {
+        margin: 0;
+        margin-left: 8px;
+        font-size: 16px;
+      }
+    }
+  }
+}
