@@ -27,6 +27,17 @@ precacheAndRoute(self.__WB_MANIFEST);
 
 precacheAndRoute([{ url: "/fontanelle/manifest.json", revision: "1" }]);
 
+precacheAndRoute([
+  {
+    url: "https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js",
+    revision: "1"
+  },
+  {
+    url: "https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css",
+    revision: "1"
+  }
+]);
+
 // Set up App Shell-style routing, so that all navigation requests
 // are fulfilled with your index.html shell. Learn more at
 // https://developers.google.com/web/fundamentals/architecture/app-shell
