@@ -16,6 +16,27 @@ import * as MapboxCircle from "mapbox-gl-circle";
 
 import "./map.scss";
 
+const Checkbox = (props: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) => (
+  <View
+    className="checkbox"
+    vAlignContent="center"
+    onClick={() => props.onChange(!props.value)}
+  >
+    <input
+      checked={props.value}
+      type="checkbox"
+      onChange={e => {
+        props.onChange(e.currentTarget.checked);
+      }}
+    />
+    <span className="checkbox-label">{props.label}</span>
+  </View>
+);
+
 const mapboxgl = window.mapboxgl;
 
 type State = {
@@ -302,24 +323,12 @@ class MapFountains extends React.PureComponent<{}, State> {
         <View grow id="map" />
 
         <View
-          style={{
-            position: "absolute",
-            top: 30,
-            right: 8,
-            zIndex: 9999999,
-            background: "white",
-            borderRadius: 4,
-            width: 30,
-            height: 30,
-            border: "2px solid #969492",
-            cursor: "pointer"
-          }}
+          className="menu-button"
           hAlignContent="center"
           vAlignContent="center"
+          onClick={() => this.setState({ isMenuOpen: true })}
         >
-          <View onClick={() => this.setState({ isMenuOpen: true })}>
-            <MenuIcon />
-          </View>
+          <MenuIcon />
 
           {/* popup */}
           <View
@@ -329,7 +338,10 @@ class MapFountains extends React.PureComponent<{}, State> {
             }}
             hAlignContent="center"
             vAlignContent="center"
-            onClick={() => this.setState({ isMenuOpen: false })}
+            onClick={e => {
+              e.stopPropagation();
+              this.setState({ isMenuOpen: false });
+            }}
           >
             <View
               className="menu-popup-content"
@@ -339,10 +351,15 @@ class MapFountains extends React.PureComponent<{}, State> {
                 e.stopPropagation();
               }}
             >
-              <span className="menu-item-label">Around radius (in meters)</span>
+              <span className="menu-item-label">
+                Around radius: <b>{this.state.around} meters</b>
+              </span>
               <input
                 value={this.state.around}
-                type="number"
+                type="range"
+                min="500"
+                max="15000"
+                step="500"
                 onChange={e => {
                   const around = parseInt(e.currentTarget.value) || 1000;
 
@@ -351,97 +368,82 @@ class MapFountains extends React.PureComponent<{}, State> {
                 }}
               />
 
-              <View className="checkbox" vAlignContent="center">
-                <input
-                  checked={this.state.showRadius}
-                  type="checkbox"
-                  onChange={e => {
-                    const showRadius = e.currentTarget.checked;
+              <View height={24} />
 
-                    this.setState({ showRadius });
-                    localforage.setItem("showRadius", showRadius);
+              <Checkbox
+                value={this.state.showRadius}
+                label="Show radius in map"
+                onChange={showRadius => {
+                  this.setState({ showRadius });
+                  localforage.setItem("showRadius", showRadius);
 
-                    if (showRadius) {
-                      this.showRadius();
+                  if (showRadius) {
+                    this.showRadius();
+                  } else {
+                    this.hideRadius();
+                  }
+                }}
+              />
+
+              <Checkbox
+                value={this.state.showDrinkingWater}
+                label='Show "drinking water"'
+                onChange={showDrinkingWater => {
+                  this.setState({ showDrinkingWater });
+
+                  map<mapboxgl.Map, void>(map => {
+                    if (showDrinkingWater) {
+                      this.drinkingWaterMarkers.forEach(marker =>
+                        marker.addTo(map)
+                      );
                     } else {
-                      this.hideRadius();
+                      this.drinkingWaterMarkers.forEach(marker =>
+                        marker.remove()
+                      );
                     }
-                  }}
-                />
-                <span className="menu-item-label">Show radius in map</span>
-              </View>
+                  })(this.map);
+                }}
+              />
 
-              <View className="checkbox" vAlignContent="center">
-                <input
-                  checked={this.state.showDrinkingWater}
-                  type="checkbox"
-                  onChange={e => {
-                    const showDrinkingWater = e.currentTarget.checked;
-                    this.setState({ showDrinkingWater });
+              <Checkbox
+                value={this.state.showToilets}
+                label='Show "toilets"'
+                onChange={showToilets => {
+                  this.setState({ showToilets });
 
-                    map<mapboxgl.Map, void>(map => {
-                      if (showDrinkingWater) {
-                        this.drinkingWaterMarkers.forEach(marker =>
-                          marker.addTo(map)
-                        );
-                      } else {
-                        this.drinkingWaterMarkers.forEach(marker =>
-                          marker.remove()
-                        );
-                      }
-                    })(this.map);
-                  }}
-                />
-                <span className="menu-item-label">Show "drinking water"</span>
-              </View>
+                  map<mapboxgl.Map, void>(map => {
+                    if (showToilets) {
+                      this.publicToiletsMarkers.forEach(marker =>
+                        marker.addTo(map)
+                      );
+                    } else {
+                      this.publicToiletsMarkers.forEach(marker =>
+                        marker.remove()
+                      );
+                    }
+                  })(this.map);
+                }}
+              />
 
-              <View className="checkbox" vAlignContent="center">
-                <input
-                  checked={this.state.showToilets}
-                  type="checkbox"
-                  onChange={e => {
-                    const showToilets = e.currentTarget.checked;
-                    this.setState({ showToilets });
+              <Checkbox
+                value={this.state.showShowers}
+                label='Show "showers"'
+                onChange={showShowers => {
+                  this.setState({ showShowers });
 
-                    map<mapboxgl.Map, void>(map => {
-                      if (showToilets) {
-                        this.publicToiletsMarkers.forEach(marker =>
-                          marker.addTo(map)
-                        );
-                      } else {
-                        this.publicToiletsMarkers.forEach(marker =>
-                          marker.remove()
-                        );
-                      }
-                    })(this.map);
-                  }}
-                />
-                <span className="menu-item-label">Show "toilets"</span>
-              </View>
-
-              <View className="checkbox" vAlignContent="center">
-                <input
-                  checked={this.state.showShowers}
-                  type="checkbox"
-                  onChange={e => {
-                    const showShowers = e.currentTarget.checked;
-                    this.setState({ showShowers });
-
-                    map<mapboxgl.Map, void>(map => {
-                      if (showShowers) {
-                        this.publicShowersMarkers.forEach(marker =>
-                          marker.addTo(map)
-                        );
-                      } else {
-                        this.publicShowersMarkers.forEach(marker =>
-                          marker.remove()
-                        );
-                      }
-                    })(this.map);
-                  }}
-                />
-                <span className="menu-item-label">Show "showers"</span>
-              </View>
+                  map<mapboxgl.Map, void>(map => {
+                    if (showShowers) {
+                      this.publicShowersMarkers.forEach(marker =>
+                        marker.addTo(map)
+                      );
+                    } else {
+                      this.publicShowersMarkers.forEach(marker =>
+                        marker.remove()
+                      );
+                    }
+                  })(this.map);
+                }}
+              />
             </View>
           </View>
         </View>

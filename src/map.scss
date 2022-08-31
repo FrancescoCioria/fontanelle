@@ -6,6 +6,29 @@
   .mapboxgl-canvas {
     position: static;
   }
+
+  .mapboxgl-ctrl-bottom-right {
+    right: 7px;
+
+    .mapboxgl-ctrl-geolocate {
+      width: 40px;
+      height: 40px;
+    }
+  }
+}
+
+.menu-button {
+  position: absolute;
+  top: 30px;
+  right: 16px;
+  z-index: 9999999;
+  background: white;
+  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  // border: 2px solid #969492;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
 }
 
 .menu-popup {
@@ -15,6 +38,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  cursor: default;
 
   .menu-popup-content {
     background: white;
@@ -28,8 +52,9 @@
     }
 
     .checkbox {
-      margin-top: 24px;
-      margin-bottom: 8px;
+      height: 48px;
+      cursor: pointer;
+      user-select: none;
 
       input {
         width: 14px;
@@ -37,7 +62,7 @@
         margin: 0;
       }
 
-      .menu-item-label {
+      .checkbox-label {
         margin: 0;
         margin-left: 8px;
         font-size: 16px;
