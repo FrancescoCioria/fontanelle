@@ -35,14 +35,19 @@ const ServiceWorkerWrapper: FC = () => {
       hAlignContent="center"
       style={{
         background: "lightgreen",
-        height: 25,
-        color: "black"
+        height: 40,
+        color: "black",
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999999999999
       }}
     >
-      Update Available
+      Update Available:
       <span
         style={{
-          marginLeft: 60,
+          marginLeft: 32,
           textDecoration: "underline",
           cursor: "pointer"
         }}
@@ -52,7 +57,7 @@ const ServiceWorkerWrapper: FC = () => {
       </span>
       <span
         style={{
-          marginLeft: 20,
+          marginLeft: 32,
           textDecoration: "underline",
           cursor: "pointer"
         }}
