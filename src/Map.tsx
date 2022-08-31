@@ -13,6 +13,7 @@ import distance from "@turf/distance";
 import localforage from "localforage";
 import MenuIcon from "./MenuIcon";
 import * as MapboxCircle from "mapbox-gl-circle";
+import LoadingBar, { LoadingBarRef } from "react-top-loading-bar";
 
 import "./map.scss";
 
@@ -80,6 +81,8 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   publicShowersMarkers: mapboxgl.Marker[] = [];
 
+  loadingBarRef = React.createRef<LoadingBarRef>();
+
   updateAmenities = () => {
     map<mapboxgl.Map, void>(map => {
       localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
@@ -101,11 +104,22 @@ class MapFountains extends React.PureComponent<{}, State> {
         }
       });
 
+      if (this.loadingBarRef.current) {
+        // @ts-ignore (continuousStart args are optional)
+        this.loadingBarRef.current.continuousStart();
+      }
+
       getOpenStreetMapAmenities({
         around: this.state.around,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
-      }).then(this.addAmenitiesMarkers);
+      })
+        .then(this.addAmenitiesMarkers)
+        .then(() => {
+          if (this.loadingBarRef.current) {
+            this.loadingBarRef.current.complete();
+          }
+        });
     })(this.map);
   };
 
@@ -320,6 +334,10 @@ class MapFountains extends React.PureComponent<{}, State> {
   render() {
     return (
       <View style={{ height: "100%", width: "100%" }} column>
+        <View>
+          <LoadingBar ref={this.loadingBarRef} color="lightgreen" height={8} />
+        </View>
+
         <View grow id="map" />
 
         <View
