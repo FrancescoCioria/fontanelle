@@ -83,6 +83,8 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   loadingBarRef = React.createRef<LoadingBarRef>();
 
+  previousCenter: { lng: number; lat: number } = { lng: 0, lat: 0 };
+
   updateAmenities = () => {
     map<mapboxgl.Map, void>(map => {
       localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
@@ -124,7 +126,20 @@ class MapFountains extends React.PureComponent<{}, State> {
   };
 
   updateAmenitiesDebounce = debounce(() => {
-    this.updateAmenities();
+    map<mapboxgl.Map, void>(map => {
+      const distanceInMeters = distance(
+        [map.getCenter().lat, map.getCenter().lng],
+        [this.previousCenter.lat, this.previousCenter.lng],
+        {
+          units: "meters"
+        }
+      );
+
+      if (distanceInMeters > this.state.around / 2) {
+        this.previousCenter = map.getCenter();
+        this.updateAmenities();
+      }
+    })(this.map);
   }, 1000);
 
   initializeMap() {
@@ -175,9 +190,11 @@ class MapFountains extends React.PureComponent<{}, State> {
         map.on("move", () => {
           this.updateAmenitiesDebounce();
 
-          if (this.state.showRadius) {
-            this.showRadius();
-          }
+          requestAnimationFrame(() => {
+            if (this.state.showRadius) {
+              this.showRadius();
+            }
+          });
         });
       });
     }
