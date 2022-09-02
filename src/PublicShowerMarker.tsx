@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export default (props: { color?: string }) => (
+export default (props: { color: string }) => (
   <svg
     enableBackground="new -0.258 -0.548 123.547 123.539"
     xmlSpace="preserve"
@@ -14,7 +14,7 @@ export default (props: { color?: string }) => (
         d="m109.63 123.6c8.148 0 14.766-6.586 14.766-14.742v-94.02c0-8.156-6.617-14.773-14.766-14.773h-94.013c-8.156 0-14.758 6.617-14.758 14.773v94.016c0 8.156 6.602 14.742 14.758 14.742h94.013z"
       />
       <path
-        fill="#FFFFFF"
+        fill={props.color}
         d="m15.617 2.559c-6.758 0-12.258 5.516-12.258 12.281v94.016c0 6.734 5.5 12.234 12.258 12.234h94.016c6.758 0 12.25-5.5 12.25-12.234v-94.02c0-6.766-5.492-12.281-12.25-12.281h-94.013z"
       />
       <path

@@ -283,7 +283,31 @@ class MapFountains extends React.PureComponent<{}, State> {
     })(this.map);
   };
 
+  color(tags: OpenStreetMapNode["tags"]): string {
+    if (
+      tags.access &&
+      !["yes", "public", "unknown", "permissive"].includes(tags.access)
+    ) {
+      return "#d0d0d0";
+    } else if (typeof tags.fee === "string" && tags.fee !== "no") {
+      return "gold";
+    }
+
+    return "white";
+  }
+
   addAmenitiesMarkers = (nodes: OpenStreetMapNode[]) => {
+    // public showers
+    this.addMarkers(
+      nodes.filter(node => node.tags.amenity === "shower"),
+      this.publicShowersNodes,
+      (node: OpenStreetMapNode) => (
+        <PublicShowerMarker color={this.color(node.tags)} />
+      ),
+      this.publicShowersMarkers,
+      this.state.showShowers
+    );
+
     // drinking_water
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "drinking_water"),
@@ -298,25 +322,10 @@ class MapFountains extends React.PureComponent<{}, State> {
       nodes.filter(node => node.tags.amenity === "toilets"),
       this.publicToiletsNodes,
       (node: OpenStreetMapNode) => (
-        <PublicToiletsMarker
-          color={
-            typeof node.tags.fee === "string" && node.tags.fee !== "no"
-              ? "gold"
-              : "white"
-          }
-        />
+        <PublicToiletsMarker color={this.color(node.tags)} />
       ),
       this.publicToiletsMarkers,
       this.state.showToilets
-    );
-
-    // public showers
-    this.addMarkers(
-      nodes.filter(node => node.tags.amenity === "shower"),
-      this.publicShowersNodes,
-      () => <PublicShowerMarker />,
-      this.publicShowersMarkers,
-      this.state.showShowers
     );
   };
 
