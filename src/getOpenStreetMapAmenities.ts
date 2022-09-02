@@ -39,7 +39,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   const cachedItems =
     (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
 
-  const nodes = uniqBy(cachedItems.concat(json.elements), i => i.id);
+  const nodes = uniqBy(json.elements.concat(cachedItems), i => i.id);
 
   // fire&forget
   localforage.setItem("amenities", nodes);
