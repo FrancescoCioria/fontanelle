@@ -258,6 +258,16 @@ class MapFountains extends React.PureComponent<{}, State> {
 
                 <div>
                   <button style="margin-top: 16px;">
+                    <a href="https://www.google.com/maps/dir//${node.lat},${
+              node.lon
+            }" target="_blank" rel="noopener noreferrer">
+                      Directions
+                    </a>
+                  </button>
+                </div>
+
+                <div>
+                  <button style="margin-top: 16px;">
                     <a href="https://www.openstreetmap.org/edit?node=${
                       node.id
                     }" target="_blank" rel="noopener noreferrer">
