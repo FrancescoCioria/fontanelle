@@ -175,6 +175,14 @@ class MapFountains extends React.PureComponent<{}, State> {
           "bottom-right"
         );
 
+        map.addControl(
+          new mapboxgl.NavigationControl({
+            showZoom: false,
+            showCompass: true
+          }),
+          "bottom-right"
+        );
+
         map.addControl(new mapboxgl.ScaleControl());
 
         map.on("load", () => {
