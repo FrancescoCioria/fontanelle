@@ -47,6 +47,8 @@ type State = {
   showDrinkingWater: boolean;
   showToilets: boolean;
   showShowers: boolean;
+  continousSearch: boolean;
+  showSearchThisAreaButton: boolean;
 };
 
 class MapFountains extends React.PureComponent<{}, State> {
@@ -56,7 +58,9 @@ class MapFountains extends React.PureComponent<{}, State> {
     showRadius: false,
     showDrinkingWater: true,
     showShowers: true,
-    showToilets: true
+    showToilets: true,
+    continousSearch: false,
+    showSearchThisAreaButton: false
   };
 
   map: Option<mapboxgl.Map> = none;
@@ -127,6 +131,11 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   updateAmenitiesDebounce = debounce(() => {
     map<mapboxgl.Map, void>(map => {
+      if (this.previousCenter.lat === 0 && this.previousCenter.lng === 0) {
+        this.previousCenter = map.getCenter();
+        return;
+      }
+
       const distanceInMeters = distance(
         [map.getCenter().lat, map.getCenter().lng],
         [this.previousCenter.lat, this.previousCenter.lng],
@@ -136,8 +145,14 @@ class MapFountains extends React.PureComponent<{}, State> {
       );
 
       if (distanceInMeters > this.state.around / 2) {
-        this.previousCenter = map.getCenter();
-        this.updateAmenities();
+        if (this.state.continousSearch) {
+          this.previousCenter = map.getCenter();
+          this.updateAmenities();
+        } else {
+          this.setState({ showSearchThisAreaButton: true });
+        }
+      } else {
+        this.setState({ showSearchThisAreaButton: false });
       }
     })(this.map);
   }, 1000);
@@ -320,7 +335,7 @@ class MapFountains extends React.PureComponent<{}, State> {
         this.circleRadius = new MapboxCircle(center, this.state.around, {
           editable: false,
           minRadius: 0,
-          fillColor: "#29AB87"
+          fillColor: "transparent"
         }).addTo(map);
       }
     })(this.map);
@@ -346,6 +361,13 @@ class MapFountains extends React.PureComponent<{}, State> {
       }
     });
 
+    // initialize "continousSearch" option
+    localforage
+      .getItem<boolean>("continousSearch")
+      .then(continousSearch =>
+        this.setState({ continousSearch: continousSearch || false })
+      );
+
     // initialize map
     this.initializeMap();
   }
@@ -364,6 +386,24 @@ class MapFountains extends React.PureComponent<{}, State> {
         </View>
 
         <View grow id="map" />
+
+        {this.state.showSearchThisAreaButton && (
+          <View
+            className="search-this-area-button"
+            vAlignContent="center"
+            hAlignContent="center"
+            onClick={() => {
+              map<mapboxgl.Map, void>(map => {
+                this.previousCenter = map.getCenter();
+                this.updateAmenities();
+
+                this.setState({ showSearchThisAreaButton: false });
+              })(this.map);
+            }}
+          >
+            Search this area
+          </View>
+        )}
 
         <View
           className="menu-button"
@@ -413,6 +453,8 @@ class MapFountains extends React.PureComponent<{}, State> {
 
               <View height={24} />
 
+              <View className="separator" />
+
               <Checkbox
                 value={this.state.showRadius}
                 label="Show radius in map"
@@ -427,6 +469,22 @@ class MapFountains extends React.PureComponent<{}, State> {
                   }
                 }}
               />
+
+              <View className="separator" />
+
+              <Checkbox
+                value={this.state.continousSearch}
+                label="Enable continous search"
+                onChange={continousSearch => {
+                  this.setState({
+                    continousSearch,
+                    showSearchThisAreaButton: false
+                  });
+                  localforage.setItem("continousSearch", continousSearch);
+                }}
+              />
+
+              <View className="separator" />
 
               <Checkbox
                 value={this.state.showDrinkingWater}

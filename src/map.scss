@@ -17,6 +17,20 @@
   }
 }
 
+.search-this-area-button {
+  position: fixed;
+  z-index: 9999999;
+  height: 40px;
+  bottom: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 24px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  cursor: pointer;
+}
+
 .menu-button {
   position: absolute;
   top: 30px;
@@ -26,7 +40,6 @@
   border-radius: 4px;
   width: 40px;
   height: 40px;
-  // border: 2px solid #969492;
   cursor: pointer;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
 }
@@ -45,6 +58,12 @@
     border-radius: 4px;
     padding: 24px;
     width: 70vw;
+
+    .separator {
+      height: 1px;
+      background: #e0e0e0;
+      margin: 8px 0;
+    }
 
     .menu-item-label {
       margin-top: 24px;
