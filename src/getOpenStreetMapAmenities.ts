@@ -3,11 +3,34 @@ import uniqBy from "lodash/uniqBy";
 
 import "localforage-getitems";
 
+type AmenityTags = { mapillary?: string } & (
+  | {
+      amenity: "drinking_water";
+    }
+  | {
+      amenity: "toilets";
+      access?: "yes" | "public" | "permissive" | "unknown";
+      changing_table?: "yes" | "no" | "unknown";
+      fee?: "yes" | "no" | "unknown";
+      charge?: string;
+      wheelchair?: "yes" | "no" | "unknown" | "limited";
+      unisex?: "yes" | "male" | "female";
+    }
+  | {
+      amenity: "shower";
+      access?: "yes" | "public" | "permissive" | "unknown";
+      hot_water?: "yes" | "no" | "unknown";
+      fee?: "yes" | "no" | "unknown";
+      charge?: string;
+      wheelchair?: "yes" | "no" | "unknown" | "limited";
+    }
+);
+
 export type OpenStreetMapNode = {
   id: number;
   lat: number;
   lon: number;
-  tags: { [k: string]: string; amenity: Amenity };
+  tags: AmenityTags;
 };
 
 const amenities = ["drinking_water", "toilets", "shower"] as const;

@@ -44,7 +44,8 @@
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
 }
 
-.menu-popup {
+.popup {
+  z-index: 9999999;
   position: fixed;
   top: 0;
   left: 0;
@@ -53,22 +54,29 @@
   background: rgba(0, 0, 0, 0.5);
   cursor: default;
 
-  .menu-popup-content {
+  .popup-content {
     background: white;
     border-radius: 4px;
     padding: 24px;
     width: 70vw;
+    max-height: 80%;
+    overflow: auto;
 
     .separator {
       height: 1px;
       background: #e0e0e0;
       margin: 8px 0;
+      flex-shrink: 0 !important;
     }
 
     .menu-item-label {
       margin-top: 24px;
       margin-bottom: 8px;
       user-select: none;
+    }
+
+    button {
+      height: 40px;
     }
 
     .checkbox {
@@ -88,5 +96,29 @@
         font-size: 16px;
       }
     }
+  }
+}
+
+.select {
+  .select-label {
+    margin-top: 24px;
+    margin-bottom: 8px;
+    user-select: none;
+  }
+
+  select {
+    height: 40px;
+  }
+}
+
+.input {
+  .input-label {
+    margin-top: 24px;
+    margin-bottom: 8px;
+    user-select: none;
+  }
+
+  input {
+    height: 40px;
   }
 }
