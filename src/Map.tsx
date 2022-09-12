@@ -4,7 +4,8 @@ import debounce from "lodash/debounce";
 import View from "react-flexview";
 import { Option, none, some, map, isSome } from "fp-ts/lib/Option";
 import getOpenStreetMapAmenities, {
-  OpenStreetMapNode
+  OpenStreetMapNode,
+  updateCachedItems
 } from "./getOpenStreetMapAmenities";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
@@ -15,36 +16,15 @@ import MenuIcon from "./MenuIcon";
 import * as MapboxCircle from "mapbox-gl-circle";
 import LoadingBar, { LoadingBarRef } from "react-top-loading-bar";
 import { Popup } from "./Popup";
-import { UpsertNodePopup } from "./UpsertNode";
+import { UpsertNode, UpsertNodePopup } from "./UpsertNode";
+import { Button, Checkbox } from "./form";
 
 import "./map.scss";
-
-const Checkbox = (props: {
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) => (
-  <View
-    className="checkbox"
-    vAlignContent="center"
-    onClick={() => props.onChange(!props.value)}
-    shrink={false}
-  >
-    <input
-      checked={props.value}
-      type="checkbox"
-      onChange={e => {
-        props.onChange(e.currentTarget.checked);
-      }}
-    />
-    <span className="checkbox-label">{props.label}</span>
-  </View>
-);
 
 const mapboxgl = window.mapboxgl;
 
 type State = {
-  upsertNode: null | (Omit<OpenStreetMapNode, "id"> & { id: number | null });
+  upsertNode: null | UpsertNode;
   isMenuOpen: boolean;
   around: number;
   showRadius: boolean;
@@ -72,23 +52,12 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   circleRadius: any | null = null;
 
-  drinkingWaterNodes: {
-    [id: string]: OpenStreetMapNode;
+  nodes: {
+    [id: string]: {
+      node: OpenStreetMapNode;
+      marker: mapboxgl.Marker;
+    };
   } = {};
-
-  drinkingWaterMarkers: mapboxgl.Marker[] = [];
-
-  publicToiletsNodes: {
-    [id: string]: OpenStreetMapNode;
-  } = {};
-
-  publicToiletsMarkers: mapboxgl.Marker[] = [];
-
-  publicShowersNodes: {
-    [id: string]: OpenStreetMapNode;
-  } = {};
-
-  publicShowersMarkers: mapboxgl.Marker[] = [];
 
   loadingBarRef = React.createRef<LoadingBarRef>();
 
@@ -236,14 +205,12 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   addMarkers = (
     nodes: OpenStreetMapNode[],
-    cacheMap: { [k: string]: OpenStreetMapNode },
     markerElement: (node: OpenStreetMapNode) => JSX.Element,
-    cachedMarkers: mapboxgl.Marker[],
     show: boolean
   ) => {
     map<mapboxgl.Map, void>(map => {
       nodes.forEach(node => {
-        if (!cacheMap[node.id]) {
+        if (!this.nodes[node.id]) {
           const element = document.createElement("div");
           ReactDOM.render(markerElement(node), element);
 
@@ -286,12 +253,6 @@ class MapFountains extends React.PureComponent<{}, State> {
                 </div>
               </div>
               `
-
-            // <a href="https://www.openstreetmap.org/edit?node=${
-            // node.id
-            // }" target="_blank" rel="noopener noreferrer">
-            // Edit node
-            // </a>
           );
 
           marker.setPopup(popup);
@@ -300,9 +261,10 @@ class MapFountains extends React.PureComponent<{}, State> {
             marker.addTo(map);
           }
 
-          cacheMap[node.id] = node;
-
-          cachedMarkers.push(marker);
+          this.nodes[node.id] = {
+            node,
+            marker
+          };
         }
       });
     })(this.map);
@@ -330,31 +292,25 @@ class MapFountains extends React.PureComponent<{}, State> {
     // public showers
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "shower"),
-      this.publicShowersNodes,
       (node: OpenStreetMapNode) => (
         <PublicShowerMarker color={this.color(node.tags)} />
       ),
-      this.publicShowersMarkers,
       this.state.showShowers
     );
 
     // drinking_water
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "drinking_water"),
-      this.drinkingWaterNodes,
       () => <DrinkingWaterMarker />,
-      this.drinkingWaterMarkers,
       this.state.showDrinkingWater
     );
 
     // toilets
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "toilets"),
-      this.publicToiletsNodes,
       (node: OpenStreetMapNode) => (
         <PublicToiletsMarker color={this.color(node.tags)} />
       ),
-      this.publicToiletsMarkers,
       this.state.showToilets
     );
   };
@@ -416,7 +372,7 @@ class MapFountains extends React.PureComponent<{}, State> {
         const node = items?.find(i => String(i.id) === nodeId);
 
         this.setState({
-          upsertNode: (node || null) as any
+          upsertNode: node ? { type: "update", node } : null
         });
       });
     };
@@ -426,6 +382,24 @@ class MapFountains extends React.PureComponent<{}, State> {
     requestAnimationFrame(() => {
       map<mapboxgl.Map, void>(map => map.resize())(this.map);
     });
+  }
+
+  drinkingWaterNodes() {
+    return Object.values(this.nodes).filter(
+      v => v.node.tags.amenity === "drinking_water"
+    );
+  }
+
+  toiletsNodes() {
+    return Object.values(this.nodes).filter(
+      v => v.node.tags.amenity === "toilets"
+    );
+  }
+
+  showerNodes() {
+    return Object.values(this.nodes).filter(
+      v => v.node.tags.amenity === "shower"
+    );
   }
 
   render() {
@@ -461,11 +435,24 @@ class MapFountains extends React.PureComponent<{}, State> {
             onClose={() => {
               this.setState({ upsertNode: null });
             }}
-            onDone={() => {
+            onDone={(node: OpenStreetMapNode) => {
+              if (this.nodes[node.id]) {
+                // remove marker
+                this.nodes[node.id].marker.remove();
+
+                // delete node from cache
+                delete this.nodes[node.id];
+              }
+
+              // show updated/created node
+              this.addAmenitiesMarkers([node]);
+
+              // fire&forget
+              updateCachedItems([node]);
+
               this.setState({ upsertNode: null });
-              this.updateCachedAmenities();
             }}
-            node={this.state.upsertNode}
+            {...this.state.upsertNode}
           />
         )}
 
@@ -544,13 +531,9 @@ class MapFountains extends React.PureComponent<{}, State> {
 
                 map<mapboxgl.Map, void>(map => {
                   if (showDrinkingWater) {
-                    this.drinkingWaterMarkers.forEach(marker =>
-                      marker.addTo(map)
-                    );
+                    this.drinkingWaterNodes().forEach(v => v.marker.addTo(map));
                   } else {
-                    this.drinkingWaterMarkers.forEach(marker =>
-                      marker.remove()
-                    );
+                    this.drinkingWaterNodes().forEach(v => v.marker.remove());
                   }
                 })(this.map);
               }}
@@ -564,13 +547,9 @@ class MapFountains extends React.PureComponent<{}, State> {
 
                 map<mapboxgl.Map, void>(map => {
                   if (showToilets) {
-                    this.publicToiletsMarkers.forEach(marker =>
-                      marker.addTo(map)
-                    );
+                    this.toiletsNodes().forEach(v => v.marker.addTo(map));
                   } else {
-                    this.publicToiletsMarkers.forEach(marker =>
-                      marker.remove()
-                    );
+                    this.toiletsNodes().forEach(v => v.marker.remove());
                   }
                 })(this.map);
               }}
@@ -584,13 +563,9 @@ class MapFountains extends React.PureComponent<{}, State> {
 
                 map<mapboxgl.Map, void>(map => {
                   if (showShowers) {
-                    this.publicShowersMarkers.forEach(marker =>
-                      marker.addTo(map)
-                    );
+                    this.showerNodes().forEach(v => v.marker.addTo(map));
                   } else {
-                    this.publicShowersMarkers.forEach(marker =>
-                      marker.remove()
-                    );
+                    this.showerNodes().forEach(v => v.marker.remove());
                   }
                 })(this.map);
               }}
@@ -598,56 +573,53 @@ class MapFountains extends React.PureComponent<{}, State> {
 
             <View className="separator" />
 
-            <button
-              style={{ marginTop: 16, cursor: "pointer", flexShrink: 0 }}
+            <Button
+              label="Add drinking fountain"
+              style={{ marginTop: 16 }}
               onClick={() => {
                 this.setState({
                   isMenuOpen: false,
                   upsertNode: {
-                    id: null,
-                    lat: 0,
-                    lon: 0,
-                    tags: { amenity: "drinking_water" }
+                    type: "create_without_coordinates",
+                    node: {
+                      tags: { amenity: "drinking_water" }
+                    }
                   }
                 });
               }}
-            >
-              Add drinking fountain
-            </button>
+            />
 
-            <button
-              style={{ marginTop: 24, cursor: "pointer", flexShrink: 0 }}
+            <Button
+              label="Add toilets"
+              style={{ marginTop: 24 }}
               onClick={() => {
                 this.setState({
                   isMenuOpen: false,
                   upsertNode: {
-                    id: null,
-                    lat: 0,
-                    lon: 0,
-                    tags: { amenity: "toilets" }
+                    type: "create_without_coordinates",
+                    node: {
+                      tags: { amenity: "toilets" }
+                    }
                   }
                 });
               }}
-            >
-              Add toilets
-            </button>
+            />
 
-            <button
-              style={{ marginTop: 24, cursor: "pointer", flexShrink: 0 }}
+            <Button
+              label="Add shower"
+              style={{ marginTop: 24 }}
               onClick={() => {
                 this.setState({
                   isMenuOpen: false,
                   upsertNode: {
-                    id: null,
-                    lat: 0,
-                    lon: 0,
-                    tags: { amenity: "shower" }
+                    type: "create_without_coordinates",
+                    node: {
+                      tags: { amenity: "shower" }
+                    }
                   }
                 });
               }}
-            >
-              Add shower
-            </button>
+            />
           </Popup>
         </View>
       </View>

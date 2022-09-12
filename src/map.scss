@@ -44,6 +44,13 @@
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
 }
 
+.separator {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 8px 0;
+  flex-shrink: 0 !important;
+}
+
 .popup {
   z-index: 9999999;
   position: fixed;
@@ -62,39 +69,10 @@
     max-height: 80%;
     overflow: auto;
 
-    .separator {
-      height: 1px;
-      background: #e0e0e0;
-      margin: 8px 0;
-      flex-shrink: 0 !important;
-    }
-
     .menu-item-label {
       margin-top: 24px;
       margin-bottom: 8px;
       user-select: none;
-    }
-
-    button {
-      height: 40px;
-    }
-
-    .checkbox {
-      height: 48px;
-      cursor: pointer;
-      user-select: none;
-
-      input {
-        width: 14px;
-        height: 14px;
-        margin: 0;
-      }
-
-      .checkbox-label {
-        margin: 0;
-        margin-left: 8px;
-        font-size: 16px;
-      }
     }
   }
 }
@@ -111,6 +89,24 @@
   }
 }
 
+.checkbox {
+  height: 48px;
+  cursor: pointer;
+  user-select: none;
+
+  input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+  }
+
+  .checkbox-label {
+    margin: 0;
+    margin-left: 8px;
+    font-size: 16px;
+  }
+}
+
 .input {
   .input-label {
     margin-top: 24px;
@@ -121,4 +117,12 @@
   input {
     height: 40px;
   }
+}
+
+.button {
+  cursor: pointer;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  border-radius: 4px;
 }

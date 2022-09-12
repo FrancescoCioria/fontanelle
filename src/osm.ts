@@ -45,7 +45,6 @@ const osmPut = <R>(options: {
   path: string;
   content: { osm?: { [k in "node" | "changeset"]?: object } };
 }) => {
-  console.log(options.content);
   return osmApi<R>({
     method: "PUT",
     path: options.path,
@@ -76,9 +75,9 @@ const wrapInChangeset = async <R>(
   return res;
 };
 
-export const osmUpdateNode = async (node: OpenStreetMapNode) => {
-  console.log(node.tags);
-
+export const osmUpdateNode = async (
+  node: OpenStreetMapNode
+): Promise<OpenStreetMapNode> => {
   await wrapInChangeset(
     `Update "${node.tags.amenity}" amenity`,
     async changesetId => {
@@ -118,22 +117,17 @@ export const osmUpdateNode = async (node: OpenStreetMapNode) => {
     }
   );
 
-  const cachedItems =
-    (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
-
-  const nodes = cachedItems.filter(i => i.id !== node.id).concat(node);
-
-  // fire&forget
-  localforage.setItem("amenities", nodes);
+  return node;
 };
 
-export const osmCreateNode = async (node: Omit<OpenStreetMapNode, "id">) => {
+export const osmCreateNode = async (
+  node: Omit<OpenStreetMapNode, "id">
+): Promise<OpenStreetMapNode> => {
   const nodeId = await wrapInChangeset<string>(
     `Add "${node.tags.amenity}" amenity`,
     changesetId =>
       osmPut({
         path: `/api/0.6/node/create`,
-
         content: {
           osm: {
             node: {
@@ -156,13 +150,8 @@ export const osmCreateNode = async (node: Omit<OpenStreetMapNode, "id">) => {
       })
   );
 
-  const cachedItems =
-    (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
-
-  const nodes = cachedItems
-    .filter(i => String(i.id) !== String(nodeId))
-    .concat({ ...node, id: parseInt(nodeId) });
-
-  // fire&forget
-  localforage.setItem("amenities", nodes);
+  return {
+    ...node,
+    id: parseInt(nodeId)
+  };
 };

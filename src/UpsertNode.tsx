@@ -3,73 +3,76 @@ import View from "react-flexview";
 import { Popup } from "./Popup";
 import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
 import { osmAuth, osmCreateNode, osmUpdateNode } from "./osm";
+import { Select, Input, Button } from "./form";
 
-type Option<V extends string> = {
-  value: V | null;
-  label: string;
-};
+export type UpsertNode =
+  | {
+      type: "create_without_coordinates";
+      node: Omit<OpenStreetMapNode, "id" | "lat" | "lon">;
+    }
+  | {
+      type: "create";
+      node: Omit<OpenStreetMapNode, "id">;
+    }
+  | {
+      type: "update";
+      node: OpenStreetMapNode;
+    }
+  | {
+      type: "update_without_coordinates";
+      node: Omit<OpenStreetMapNode, "lat" | "lon">;
+    };
 
-const Select = <V extends string>(props: {
-  value?: V;
-  label: string;
-  onChange: (value: V) => void;
-  options: Option<V>[];
-}) => {
-  return (
-    <View column className="select" shrink={false}>
-      <span className="select-label">{props.label}</span>
-      <select
-        value={props.value}
-        onChange={e => props.onChange(e.currentTarget.value as V)}
-      >
-        <option value="">Select an option</option>
-        {props.options.map(o => (
-          <option key={o.value} value={o.value || ""}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </View>
-  );
-};
-
-const Input = (props: {
-  value?: string;
-  label: string;
-  onChange: (value: string) => void;
-}) => {
-  return (
-    <View column className="input" shrink={false}>
-      <span className="input-label">{props.label}</span>
-      <input
-        value={props.value || ""}
-        onChange={e => props.onChange(e.currentTarget.value)}
-      />
-    </View>
-  );
-};
-
-export const UpsertNodePopup = (props: {
+type Props = {
   map: mapboxgl.Map;
-  node: Omit<OpenStreetMapNode, "id"> & { id: number | null };
   onClose: () => void;
-  onDone: () => void;
-}) => {
-  const [node, updateNode] = React.useState({ ...props.node });
+  onDone: (node: OpenStreetMapNode) => void;
+} & UpsertNode;
+
+export const UpsertNodePopup = (props: Props) => {
+  const [state, updateState] = React.useState<UpsertNode>(props);
 
   const editNodeTag = (tag: string, value: string) => {
-    updateNode({
-      ...node,
-      tags: {
-        ...node.tags,
-        [tag]: value || null
-      }
+    const tags: OpenStreetMapNode["tags"] = {
+      ...state.node.tags,
+      [tag]: value || null
+    };
+
+    updateState({
+      ...state,
+      node: {
+        ...state.node,
+        tags
+      } as never
     });
   };
 
   const getForm = () => {
+    const node = state.node;
+
     return (
       <View column shrink={false}>
+        <Button
+          label="Change Position"
+          onClick={() => {
+            if (state.type === "create") {
+              updateState({
+                type: "create_without_coordinates",
+                node: {
+                  ...state.node
+                }
+              });
+            } else if (state.type === "update") {
+              updateState({
+                type: "update_without_coordinates",
+                node: {
+                  ...state.node
+                }
+              });
+            }
+          }}
+        />
+
         {(node.tags.amenity === "toilets" ||
           node.tags.amenity === "shower") && (
           <Select
@@ -177,104 +180,121 @@ export const UpsertNodePopup = (props: {
     }
   };
 
-  if (osmAuth.authenticated() && node.lat === 0 && node.lon === 0) {
-    // node needs positioning
-
-    return (
-      <>
-        <View
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 99999,
-            pointerEvents: "none",
-            fontSize: 24
-          }}
-          vAlignContent="center"
-          hAlignContent="center"
-          grow
-        >
-          ✕
-        </View>
-
-        <View
-          style={{
-            position: "fixed",
-            left: 0,
-            right: 0,
-            bottom: 66,
-            zIndex: 99999
-          }}
-          vAlignContent="center"
-          hAlignContent="center"
-        >
-          <View
-            style={{
-              paddingTop: 16,
-              paddingBottom: 16,
-              paddingRight: 48,
-              paddingLeft: 48,
-              borderRadius: 8,
-              background: "rgba(0, 0, 0, 0.1)"
-            }}
-          >
-            <button
-              style={{ cursor: "pointer", height: 40, marginRight: 32 }}
-              onClick={props.onClose}
-            >
-              Cancel
-            </button>
-            <button
-              style={{ cursor: "pointer", height: 40 }}
-              onClick={() => {
-                updateNode({
-                  ...node,
-                  lat: props.map.getCenter().lat,
-                  lon: props.map.getCenter().lng
-                });
+  if (osmAuth.authenticated()) {
+    switch (state.type) {
+      case "create_without_coordinates":
+      case "update_without_coordinates": {
+        return (
+          <>
+            <View
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 99999,
+                pointerEvents: "none",
+                fontSize: 24
               }}
+              vAlignContent="center"
+              hAlignContent="center"
+              grow
             >
-              Confirm
-            </button>
-          </View>
-        </View>
-      </>
-    );
-  } else if (osmAuth.authenticated()) {
-    // node is positioned and ready to be updated/created
-    return (
-      <Popup onClose={props.onClose} isOpen={true}>
-        <h2>{getTitle()}</h2>
+              ✕
+            </View>
 
-        {getForm()}
+            <View
+              style={{
+                position: "fixed",
+                left: 0,
+                right: 0,
+                bottom: 66,
+                zIndex: 99999
+              }}
+              vAlignContent="center"
+              hAlignContent="center"
+            >
+              <View
+                style={{
+                  paddingTop: 16,
+                  paddingBottom: 16,
+                  paddingRight: 48,
+                  paddingLeft: 48,
+                  borderRadius: 8,
+                  background: "rgba(0, 0, 0, 0.1)"
+                }}
+              >
+                <Button
+                  label="Cancel"
+                  style={{ marginRight: 32 }}
+                  onClick={props.onClose}
+                />
 
-        <button
-          style={{
-            marginTop: 48,
-            height: 40,
-            width: 200,
-            marginLeft: "auto",
-            flexShrink: 0
-          }}
-          onClick={() => {
-            if (node.id === null) {
-              // create
-              osmCreateNode({ ...node }).then(() => props.onDone());
-            } else {
-              // update
-              osmUpdateNode({ ...node, id: node.id }).then(() =>
-                props.onDone()
-              );
-            }
-          }}
-        >
-          Save on OSM
-        </button>
-      </Popup>
-    );
+                <Button
+                  label="Confirm"
+                  onClick={() => {
+                    const coordinates = {
+                      lat: props.map.getCenter().lat,
+                      lon: props.map.getCenter().lng
+                    };
+                    if (state.type === "create_without_coordinates") {
+                      updateState({
+                        type: "create",
+                        node: {
+                          ...state.node,
+                          ...coordinates
+                        }
+                      });
+                    } else {
+                      updateState({
+                        type: "update",
+                        node: {
+                          ...state.node,
+                          ...coordinates
+                        }
+                      });
+                    }
+                  }}
+                />
+              </View>
+            </View>
+          </>
+        );
+      }
+
+      case "create":
+      case "update": {
+        return (
+          <Popup onClose={props.onClose} isOpen={true}>
+            <h2 style={{ margin: 0, textAlign: "center" }}>{getTitle()}</h2>
+
+            <View style={{ margin: "16px 0 24px" }} className="separator" />
+
+            {getForm()}
+
+            <View style={{ marginTop: 32 }} className="separator" />
+
+            <Button
+              label="Save on OSM"
+              style={{
+                marginTop: 24,
+                background: "#24A0ED"
+              }}
+              onClick={() => {
+                if (state.type === "create") {
+                  // create
+                  osmCreateNode({ ...state.node }).then(props.onDone);
+                } else {
+                  // update
+                  osmUpdateNode({ ...state.node }).then(props.onDone);
+                }
+              }}
+            />
+          </Popup>
+        );
+      }
+    }
   } else {
     // user is not logged in OSM
     return (
@@ -283,22 +303,19 @@ export const UpsertNodePopup = (props: {
           You need to be logged into Open Street Maps to add and edit nodes
         </h2>
 
-        <button
+        <Button
+          label="Log in OSM"
           style={{
             marginTop: 48,
-            height: 40,
-            width: 200,
             marginLeft: "auto",
             flexShrink: 0
           }}
           onClick={() => {
             osmAuth.authenticate(() => {
-              updateNode({ ...node });
+              updateState({ ...state });
             });
           }}
-        >
-          Log in OSM
-        </button>
+        />
       </Popup>
     );
   }

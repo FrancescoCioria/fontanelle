@@ -43,6 +43,16 @@ export type Options = {
   lng: number;
 };
 
+export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
+  const cachedItems =
+    (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
+
+  const nodes = uniqBy(newNodes.concat(cachedItems), i => i.id);
+
+  // fire&forget
+  localforage.setItem("amenities", nodes);
+};
+
 export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   const formData = `
     [out:json];
@@ -59,13 +69,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
 
   const json: { elements: OpenStreetMapNode[] } = await res.json();
 
-  const cachedItems =
-    (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
-
-  const nodes = uniqBy(json.elements.concat(cachedItems), i => i.id);
-
-  // fire&forget
-  localforage.setItem("amenities", nodes);
+  updateCachedItems(json.elements);
 
   return json.elements;
 };
