@@ -68,25 +68,27 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   updateCachedAmenities = () => {
     map<mapboxgl.Map, void>(map => {
+      const center = map.getCenter();
+
       localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
         if (items) {
-          this.addAmenitiesMarkers(
-            // add cached nodes contained in the circle radius
-            items.filter(node => {
-              const distanceInMeters = distance(
-                [map.getCenter().lat, map.getCenter().lng],
-                [node.lat, node.lon],
-                {
-                  units: "meters"
-                }
-              );
+          const nodesInRadius = items.filter(node => {
+            const distanceInMeters = distance(
+              [center.lng, center.lat],
+              [node.lon, node.lat],
+              {
+                units: "meters"
+              }
+            );
 
-              return distanceInMeters < this.state.around;
-            })
-          );
+            return distanceInMeters < this.state.around;
+          });
+
+          // add cached nodes contained in the circle radius
+          this.addAmenitiesMarkers(nodesInRadius);
         }
       });
-    });
+    })(this.map);
   };
 
   updateAmenities = () => {
@@ -104,7 +106,7 @@ class MapFountains extends React.PureComponent<{}, State> {
         lng: map.getCenter().lng
       })
         .then(this.addAmenitiesMarkers)
-        .then(() => {
+        .finally(() => {
           if (this.loadingBarRef.current) {
             this.loadingBarRef.current.complete();
           }
