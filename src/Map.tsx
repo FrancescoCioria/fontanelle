@@ -18,12 +18,14 @@ import LoadingBar, { LoadingBarRef } from "react-top-loading-bar";
 import { Popup } from "./Popup";
 import { UpsertNode, UpsertNodePopup } from "./UpsertNode";
 import { Button, Checkbox } from "./form";
+import BottomSheet from "./BottomSheet";
 
 import "./map.scss";
 
 const mapboxgl = window.mapboxgl;
 
 type State = {
+  openedNode: null | OpenStreetMapNode;
   upsertNode: null | UpsertNode;
   isMenuOpen: boolean;
   around: number;
@@ -37,6 +39,7 @@ type State = {
 
 class MapFountains extends React.PureComponent<{}, State> {
   state: State = {
+    openedNode: null,
     upsertNode: null,
     isMenuOpen: false,
     around: 0,
@@ -212,50 +215,21 @@ class MapFountains extends React.PureComponent<{}, State> {
       nodes.forEach(node => {
         if (!this.nodes[node.id]) {
           const element = document.createElement("div");
-          ReactDOM.render(markerElement(node), element);
+
+          ReactDOM.render(
+            <div
+              onClick={() => {
+                this.setState({ openedNode: node });
+              }}
+            >
+              {markerElement(node)}
+            </div>,
+            element
+          );
 
           const marker: mapboxgl.Marker = new mapboxgl.Marker({
             element
           }).setLngLat([node.lon, node.lat]);
-
-          const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<div style="overflow-wrap: break-word;">
-                ${Object.keys(node.tags)
-                  .map(k => `<b>${k}:</b> ${node.tags[k as never]}`)
-                  .join("<br />")}
-
-                ${
-                  node.tags.mapillary
-                    ? `<button style="margin-top: 16px;">
-                        <a href="${node.tags.mapillary}" target="_blank" rel="noopener noreferrer">
-                          See street view
-                        </a>
-                      </button>`
-                    : ""
-                }
-
-                <div>
-                  <button style="margin-top: 16px;">
-                    <a href="https://www.google.com/maps/dir//${node.lat},${
-              node.lon
-            }" target="_blank" rel="noopener noreferrer">
-                      Directions
-                    </a>
-                  </button>
-                </div>
-
-                <div>
-                  <button style="margin-top: 16px;" onclick="editNode('${
-                    node.id
-                  }')">
-                    Edit node
-                  </button>
-                </div>
-              </div>
-              `
-          );
-
-          marker.setPopup(popup);
 
           if (show) {
             marker.addTo(map);
@@ -293,7 +267,7 @@ class MapFountains extends React.PureComponent<{}, State> {
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "shower"),
       (node: OpenStreetMapNode) => (
-        <PublicShowerMarker color={this.color(node.tags)} />
+        <PublicShowerMarker color={this.color(node.tags)} size={20} />
       ),
       this.state.showShowers
     );
@@ -301,7 +275,7 @@ class MapFountains extends React.PureComponent<{}, State> {
     // drinking_water
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "drinking_water"),
-      () => <DrinkingWaterMarker />,
+      () => <DrinkingWaterMarker size={20} />,
       this.state.showDrinkingWater
     );
 
@@ -309,7 +283,7 @@ class MapFountains extends React.PureComponent<{}, State> {
     this.addMarkers(
       nodes.filter(node => node.tags.amenity === "toilets"),
       (node: OpenStreetMapNode) => (
-        <PublicToiletsMarker color={this.color(node.tags)} />
+        <PublicToiletsMarker color={this.color(node.tags)} size={20} />
       ),
       this.state.showToilets
     );
@@ -365,17 +339,6 @@ class MapFountains extends React.PureComponent<{}, State> {
 
     // initialize map
     this.initializeMap();
-
-    // edit node cb
-    (window as any).editNode = (nodeId: string) => {
-      localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
-        const node = items?.find(i => String(i.id) === nodeId);
-
-        this.setState({
-          upsertNode: node ? { type: "update", node } : null
-        });
-      });
-    };
   }
 
   componentDidUpdate() {
@@ -411,7 +374,19 @@ class MapFountains extends React.PureComponent<{}, State> {
 
         <View grow id="map" />
 
-        {this.state.showSearchThisAreaButton && (
+        {this.state.openedNode && (
+          <BottomSheet
+            node={this.state.openedNode}
+            onDismiss={() => this.setState({ openedNode: null })}
+            onEditNode={node =>
+              this.setState({
+                upsertNode: { type: "update", node }
+              })
+            }
+          />
+        )}
+
+        {this.state.showSearchThisAreaButton && this.state.openedNode === null && (
           <View
             className="search-this-area-button"
             vAlignContent="center"

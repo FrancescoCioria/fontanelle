@@ -1,12 +1,12 @@
 import * as React from "react";
 
-export default (props: { color: string }) => (
+export default (props: { color: string; size: number }) => (
   <svg
     enableBackground="new -0.258 -0.548 123.547 123.539"
     xmlSpace="preserve"
     viewBox="-0.258 -0.548 123.547 123.539"
-    width="20px"
-    height="20px"
+    width={props.size}
+    height={props.size}
   >
     <g>
       <path

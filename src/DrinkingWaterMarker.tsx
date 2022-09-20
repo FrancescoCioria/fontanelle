@@ -1,9 +1,9 @@
 import * as React from "react";
 
-export default () => (
+export default (props: { size: number }) => (
   <svg
-    width="20px"
-    height="20px"
+    width={props.size}
+    height={props.size}
     viewBox="0 0 508 508"
     enableBackground="new 0 0 508 508"
     xmlSpace="preserve"
