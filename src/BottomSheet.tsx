@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BottomSheet, BottomSheetRef } from "react-spring-bottom-sheet";
 import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
 import View from "react-flexview";
@@ -33,6 +33,10 @@ export default (props: Props) => {
   const sheetRef = useRef<BottomSheetRef>(null);
 
   const [isOpen, updateOpen] = useState(true);
+
+  useEffect(() => {
+    updateOpen(true);
+  }, [props.node]);
 
   const color = (tags: OpenStreetMapNode["tags"]): string => {
     if (
@@ -91,7 +95,7 @@ export default (props: Props) => {
       onDismiss={() => updateOpen(false)}
       onSpringEnd={() => !isOpen && props.onDismiss()}
       snapPoints={({ maxHeight }) => {
-        return [window.innerHeight * 0.35, maxHeight];
+        return [window.innerHeight * 0.45, maxHeight];
       }}
       defaultSnap={({ snapPoints }) => snapPoints[0]}
       maxHeight={window.innerHeight * 0.85}
