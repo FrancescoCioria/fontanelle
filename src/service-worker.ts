@@ -29,10 +29,10 @@ precacheAndRoute([{ url: "/fontanelle/manifest.json", revision: "1" }]);
 
 precacheAndRoute([
   {
-    url: "https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"
+    url: "https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.js"
   },
   {
-    url: "https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css"
+    url: "https://api.mapbox.com/mapbox-gl-js/v2.10.0/mapbox-gl.css"
   }
 ]);
 
