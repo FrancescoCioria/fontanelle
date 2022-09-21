@@ -1,25 +1,25 @@
 {
   "files": {
-    "main.css": "/fontanelle/static/css/main.96d806fb.chunk.css",
-    "main.js": "/fontanelle/static/js/main.ea84e021.chunk.js",
-    "main.js.map": "/fontanelle/static/js/main.ea84e021.chunk.js.map",
+    "main.css": "/fontanelle/static/css/main.f2993225.chunk.css",
+    "main.js": "/fontanelle/static/js/main.22302082.chunk.js",
+    "main.js.map": "/fontanelle/static/js/main.22302082.chunk.js.map",
     "runtime-main.js": "/fontanelle/static/js/runtime-main.1047cc81.js",
     "runtime-main.js.map": "/fontanelle/static/js/runtime-main.1047cc81.js.map",
     "static/css/2.9c5eef5f.chunk.css": "/fontanelle/static/css/2.9c5eef5f.chunk.css",
-    "static/js/2.9a7e7903.chunk.js": "/fontanelle/static/js/2.9a7e7903.chunk.js",
-    "static/js/2.9a7e7903.chunk.js.map": "/fontanelle/static/js/2.9a7e7903.chunk.js.map",
+    "static/js/2.0cd80ffb.chunk.js": "/fontanelle/static/js/2.0cd80ffb.chunk.js",
+    "static/js/2.0cd80ffb.chunk.js.map": "/fontanelle/static/js/2.0cd80ffb.chunk.js.map",
     "index.html": "/fontanelle/index.html",
     "service-worker.js": "/fontanelle/service-worker.js",
     "service-worker.js.map": "/fontanelle/service-worker.js.map",
     "static/css/2.9c5eef5f.chunk.css.map": "/fontanelle/static/css/2.9c5eef5f.chunk.css.map",
-    "static/css/main.96d806fb.chunk.css.map": "/fontanelle/static/css/main.96d806fb.chunk.css.map",
-    "static/js/2.9a7e7903.chunk.js.LICENSE.txt": "/fontanelle/static/js/2.9a7e7903.chunk.js.LICENSE.txt"
+    "static/css/main.f2993225.chunk.css.map": "/fontanelle/static/css/main.f2993225.chunk.css.map",
+    "static/js/2.0cd80ffb.chunk.js.LICENSE.txt": "/fontanelle/static/js/2.0cd80ffb.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
     "static/js/runtime-main.1047cc81.js",
     "static/css/2.9c5eef5f.chunk.css",
-    "static/js/2.9a7e7903.chunk.js",
-    "static/css/main.96d806fb.chunk.css",
-    "static/js/main.ea84e021.chunk.js"
+    "static/js/2.0cd80ffb.chunk.js",
+    "static/css/main.f2993225.chunk.css",
+    "static/js/main.22302082.chunk.js"
   ]
 }
