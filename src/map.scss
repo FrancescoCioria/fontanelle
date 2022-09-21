@@ -140,3 +140,8 @@ h4 {
     margin-top: 0;
   }
 }
+
+svg {
+  // buffered-rendering: static;
+  contain: paint;
+}

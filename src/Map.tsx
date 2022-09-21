@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import debounce from "lodash/debounce";
+import throttle from "lodash/throttle";
 import View from "react-flexview";
 import { Option, none, some, map, isSome } from "fp-ts/lib/Option";
 import getOpenStreetMapAmenities, {
@@ -39,6 +40,12 @@ type State = {
   showSearchThisAreaButton: boolean;
 };
 
+type StateNode = {
+  node: OpenStreetMapNode;
+  marker: mapboxgl.Marker;
+  visible: boolean;
+};
+
 class MapFountains extends React.PureComponent<{}, State> {
   state: State = {
     openedNode: null,
@@ -62,10 +69,7 @@ class MapFountains extends React.PureComponent<{}, State> {
   circleRadius: any | null = null;
 
   nodes: {
-    [id: string]: {
-      node: OpenStreetMapNode;
-      marker: mapboxgl.Marker;
-    };
+    [id: string]: StateNode;
   } = {};
 
   loadingBarRef = React.createRef<LoadingBarRef>();
@@ -152,6 +156,18 @@ class MapFountains extends React.PureComponent<{}, State> {
     });
   }, 1000);
 
+  updateMarkersThrottle = throttle(() => {
+    // virtualize markers
+
+    Object.values(this.nodes).forEach(v => {
+      if (v.visible) {
+        this.hideNode(v);
+      } else {
+        this.showNode(v);
+      }
+    });
+  }, 96);
+
   initializeMap() {
     mapboxgl.accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
@@ -212,6 +228,8 @@ class MapFountains extends React.PureComponent<{}, State> {
             if (this.state.showRadius) {
               this.showRadius();
             }
+
+            this.updateMarkersThrottle();
           });
         });
       });
@@ -220,6 +238,8 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   addAmenitiesMarkers = (nodes: OpenStreetMapNode[]) => {
     this.getMap(map => {
+      const bounds = map.getBounds();
+
       const amenitiesMapOrder: { [k in Amenity]: number } = {
         drinking_water: 1,
         shower: 2,
@@ -247,13 +267,17 @@ class MapFountains extends React.PureComponent<{}, State> {
             element
           }).setLngLat([node.lon, node.lat]);
 
-          if (this.state.filters[node.tags.amenity]) {
+          const visible =
+            this.state.filters[node.tags.amenity] && bounds.contains(node);
+
+          if (visible) {
             marker.addTo(map);
           }
 
           this.nodes[node.id] = {
             node,
-            marker
+            marker,
+            visible
           };
         }
       });
@@ -333,6 +357,32 @@ class MapFountains extends React.PureComponent<{}, State> {
     });
   }
 
+  showNode = (node: StateNode) => {
+    this.getMap(map => {
+      if (
+        !this.nodes[node.node.id].visible &&
+        this.state.filters[node.node.tags.amenity] &&
+        map.getBounds().contains(node.node)
+      ) {
+        node.marker.addTo(map);
+        this.nodes[node.node.id] = { ...node, visible: true };
+      }
+    });
+  };
+
+  hideNode = (node: StateNode) => {
+    this.getMap(map => {
+      if (
+        this.nodes[node.node.id].visible &&
+        (!this.state.filters[node.node.tags.amenity] ||
+          !map.getBounds().contains(node.node))
+      ) {
+        node.marker.remove();
+        this.nodes[node.node.id] = { ...node, visible: false };
+      }
+    });
+  };
+
   render() {
     const filters = amenities.map(
       (amenity): JSX.Element => (
@@ -343,11 +393,11 @@ class MapFountains extends React.PureComponent<{}, State> {
           onChange={show => {
             this.updateFilter(amenity, show);
 
-            this.getMap(map => {
+            setTimeout(() => {
               if (show) {
-                this.amenityNodes(amenity).forEach(v => v.marker.addTo(map));
+                this.amenityNodes(amenity).forEach(this.showNode);
               } else {
-                this.amenityNodes(amenity).forEach(v => v.marker.remove());
+                this.amenityNodes(amenity).forEach(this.hideNode);
               }
             });
           }}
