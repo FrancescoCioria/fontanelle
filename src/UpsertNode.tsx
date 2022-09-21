@@ -82,7 +82,8 @@ export const UpsertNodePopup = (props: Props) => {
             options={[
               { value: "unknown", label: "Unknown" },
               { value: "yes", label: "Yes" },
-              { value: "permissive", label: "Permissive" }
+              { value: "permissive", label: "Permissive" },
+              { value: "customers", label: "Customers" }
             ]}
           />
         )}
