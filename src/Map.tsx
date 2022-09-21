@@ -424,6 +424,7 @@ class MapFountains extends React.PureComponent<{}, State> {
           className="menu-button"
           hAlignContent="center"
           vAlignContent="center"
+          style={this.state.openedNode ? { zIndex: 2 } : undefined}
           onClick={() => this.setState({ isMenuOpen: true })}
         >
           <MenuIcon />
