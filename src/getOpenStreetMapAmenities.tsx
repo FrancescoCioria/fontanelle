@@ -5,6 +5,7 @@ import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
 import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
+import OpeningHours from "opening_hours";
 
 import "localforage-getitems";
 
@@ -20,6 +21,7 @@ type AmenityTags = { mapillary?: string } & (
       charge?: string;
       wheelchair?: "yes" | "no" | "unknown" | "limited";
       unisex?: "yes" | "male" | "female";
+      opening_hours?: string;
     }
   | {
       amenity: "shower";
@@ -28,12 +30,14 @@ type AmenityTags = { mapillary?: string } & (
       fee?: "yes" | "no" | "unknown";
       charge?: string;
       wheelchair?: "yes" | "no" | "unknown" | "limited";
+      opening_hours?: string;
     }
   | {
       amenity: "public_bath";
       access?: "yes" | "public" | "permissive" | "unknown";
       fee?: "yes" | "no" | "unknown";
       charge?: string;
+      opening_hours?: string;
     }
   | {
       amenity: "bicycle_repair_station";
@@ -100,22 +104,40 @@ export const getAmenityMarker = (
   amenityTags: AmenityTags,
   size: number
 ): JSX.Element => {
-  const color = (): string => {
-    if (
-      "access" in amenityTags &&
+  const disabledColor = "#d0d0d0";
+
+  const closed = (): string | null => {
+    try {
+      if ("opening_hours" in amenityTags && amenityTags.opening_hours) {
+        const oh = new OpeningHours(amenityTags.opening_hours);
+
+        return oh.getUnknown() ? null : oh.getState() ? null : disabledColor;
+      }
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const notPublic = (): string | null => {
+    return "access" in amenityTags &&
       amenityTags.access &&
       !["yes", "public", "unknown", "permissive"].includes(amenityTags.access)
-    ) {
-      return "#d0d0d0";
-    } else if (
-      "fee" in amenityTags &&
+      ? disabledColor
+      : null;
+  };
+
+  const feeRequired = (): string | null => {
+    return "fee" in amenityTags &&
       typeof amenityTags.fee === "string" &&
       amenityTags.fee !== "no"
-    ) {
-      return "gold";
-    }
+      ? "gold"
+      : null;
+  };
 
-    return "white";
+  const color = (): string => {
+    return closed() || notPublic() || feeRequired() || "white";
   };
 
   switch (amenityTags.amenity) {

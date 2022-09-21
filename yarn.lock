@@ -1105,7 +1105,7 @@
   dependencies:
     regenerator-runtime "^0.13.4"
 
-"@babel/runtime@^7.3.1":
+"@babel/runtime@^7.17.2", "@babel/runtime@^7.18.9", "@babel/runtime@^7.3.1":
   version "7.19.0"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.19.0.tgz#22b11c037b094d27a8a2504ea4dcff00f50e2259"
   integrity sha512-eR8Lo9hnDS7tqkO7NsV+mKvCmv5boaXFSZ70DnfhcgiEne8hv9oCEd36Klw74EtizEqLsy4YnW8UWwpBVolHZA==
@@ -6387,6 +6387,20 @@ humanize-url@^1.0.0:
     normalize-url "^1.0.0"
     strip-url-auth "^1.0.0"
 
+i18next-browser-languagedetector@^6.1.4:
+  version "6.1.5"
+  resolved "https://registry.yarnpkg.com/i18next-browser-languagedetector/-/i18next-browser-languagedetector-6.1.5.tgz#ed8c9319a8d246995d8ec8fccb5bf5f4248d0fb1"
+  integrity sha512-11t7b39oKeZe4uyMxLSPnfw28BCPNLZgUk7zyufex0zKXZ+Bv+JnmJgoB+IfQLZwDt1d71PM8vwBX1NCgliY3g==
+  dependencies:
+    "@babel/runtime" "^7.18.9"
+
+i18next@^21.8.3:
+  version "21.9.2"
+  resolved "https://registry.yarnpkg.com/i18next/-/i18next-21.9.2.tgz#3f7c5594393eb27117c1db4c38f5ec766e68de0e"
+  integrity sha512-00fVrLQOwy45nm3OtC9l1WiLK3nJlIYSljgCt0qzTaAy65aciMdRy9GsuW+a2AtKtdg9/njUGfRH30LRupV7ZQ==
+  dependencies:
+    "@babel/runtime" "^7.17.2"
+
 iconv-lite@0.4.24, iconv-lite@^0.4.17:
   version "0.4.24"
   resolved "https://registry.yarnpkg.com/iconv-lite/-/iconv-lite-0.4.24.tgz#2022b4b25fbddc21d2f524974a474aafe733908b"
@@ -8813,6 +8827,15 @@ open@^7.0.2, open@^7.3.1:
   dependencies:
     is-docker "^2.0.0"
     is-wsl "^2.1.1"
+
+opening_hours@^3.8.0:
+  version "3.8.0"
+  resolved "https://registry.yarnpkg.com/opening_hours/-/opening_hours-3.8.0.tgz#e6d0a0bfd4e0f2cb8f62321e468dcaa8a798bd79"
+  integrity sha512-bRJroECQSe/itVcNmC3j9PPicxn/LBowdd1Hi+4Aa7hCswdt7w81WHfUwrEMbtk1BBYmGJEbSepl8oYYPviSuA==
+  dependencies:
+    i18next "^21.8.3"
+    i18next-browser-languagedetector "^6.1.4"
+    suncalc "^1.9.0"
 
 opn@^5.5.0:
   version "5.5.0"
@@ -11827,6 +11850,11 @@ stylehacks@^4.0.0:
     browserslist "^4.0.0"
     postcss "^7.0.0"
     postcss-selector-parser "^3.0.0"
+
+suncalc@^1.9.0:
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/suncalc/-/suncalc-1.9.0.tgz#26212353fae61edb287c2d558fc4932ecf0e1532"
+  integrity sha512-vMJ8Byp1uIPoj+wb9c1AdK4jpkSKVAywgHX0lqY7zt6+EWRRC3Z+0Ucfjy/0yxTVO1hwwchZe4uoFNqrIC24+A==
 
 supercluster@^2.3.0:
   version "2.3.0"
