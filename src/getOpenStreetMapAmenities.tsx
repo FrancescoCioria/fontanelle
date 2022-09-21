@@ -4,9 +4,9 @@ import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
 import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
+import PublicBathMarker from "./PublicBathMarker";
 
 import "localforage-getitems";
-import PublicBathMarker from "./PublicBathMarker";
 
 type AmenityTags = { mapillary?: string } & (
   | {

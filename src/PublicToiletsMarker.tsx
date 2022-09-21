@@ -1,5 +1,3 @@
-import * as React from "react";
-
 export default (props: { color: string; size: number }) => (
   <svg
     width={props.size}

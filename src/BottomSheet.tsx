@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { BottomSheet, BottomSheetRef } from "react-spring-bottom-sheet";
+import { useEffect, useState } from "react";
+import { BottomSheet } from "react-spring-bottom-sheet";
 import {
   getAmenityMarker,
   getAmenityTitle,
   OpenStreetMapNode
 } from "./getOpenStreetMapAmenities";
 import View from "react-flexview";
-import DrinkingWaterMarker from "./DrinkingWaterMarker";
-import PublicToiletsMarker from "./PublicToiletsMarker";
-import PublicShowerMarker from "./PublicShowerMarker";
 import { Button } from "./form";
 import capitalize from "lodash/capitalize";
 
@@ -34,31 +31,11 @@ type Props = {
 };
 
 export default (props: Props) => {
-  const sheetRef = useRef<BottomSheetRef>(null);
-
   const [isOpen, updateOpen] = useState(true);
 
   useEffect(() => {
     updateOpen(true);
   }, [props.node]);
-
-  const color = (tags: OpenStreetMapNode["tags"]): string => {
-    if (
-      "access" in tags &&
-      tags.access &&
-      !["yes", "public", "unknown", "permissive"].includes(tags.access)
-    ) {
-      return "#d0d0d0";
-    } else if (
-      "fee" in tags &&
-      typeof tags.fee === "string" &&
-      tags.fee !== "no"
-    ) {
-      return "gold";
-    }
-
-    return "white";
-  };
 
   const openUrl = (url: string) => window.open(url, "_blank");
 
@@ -66,7 +43,6 @@ export default (props: Props) => {
     <BottomSheet
       style={{ borderRadius: 40 }}
       open={isOpen}
-      ref={sheetRef}
       onDismiss={() => updateOpen(false)}
       onSpringEnd={() => !isOpen && props.onDismiss()}
       snapPoints={({ maxHeight }) => {

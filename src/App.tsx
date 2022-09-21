@@ -1,4 +1,3 @@
-import React from "react";
 import Map from "./Map";
 import View from "react-flexview";
 import ServiceWorkerWrapper from "./ServiceWorkerWrapper";

@@ -20,6 +20,7 @@ import { Popup } from "./Popup";
 import { UpsertNode, UpsertNodePopup } from "./UpsertNode";
 import { Button, Checkbox } from "./form";
 import BottomSheet from "./BottomSheet";
+import sortBy from "lodash/sortBy";
 
 import "./map.scss";
 
@@ -71,8 +72,12 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   previousCenter: { lng: number; lat: number } = { lng: 0, lat: 0 };
 
+  getMap(cb: (map: mapboxgl.Map) => void) {
+    map<mapboxgl.Map, void>(cb)(this.map);
+  }
+
   updateCachedAmenities = () => {
-    map<mapboxgl.Map, void>(map => {
+    this.getMap(map => {
       const center = map.getCenter();
 
       localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
@@ -93,11 +98,11 @@ class MapFountains extends React.PureComponent<{}, State> {
           this.addAmenitiesMarkers(nodesInRadius);
         }
       });
-    })(this.map);
+    });
   };
 
   updateAmenities = () => {
-    map<mapboxgl.Map, void>(map => {
+    this.getMap(map => {
       this.updateCachedAmenities();
 
       if (this.loadingBarRef.current) {
@@ -116,11 +121,11 @@ class MapFountains extends React.PureComponent<{}, State> {
             this.loadingBarRef.current.complete();
           }
         });
-    })(this.map);
+    });
   };
 
   updateAmenitiesDebounce = debounce(() => {
-    map<mapboxgl.Map, void>(map => {
+    this.getMap(map => {
       if (this.previousCenter.lat === 0 && this.previousCenter.lng === 0) {
         this.previousCenter = map.getCenter();
         return;
@@ -144,7 +149,7 @@ class MapFountains extends React.PureComponent<{}, State> {
       } else {
         this.setState({ showSearchThisAreaButton: false });
       }
-    })(this.map);
+    });
   }, 1000);
 
   initializeMap() {
@@ -214,8 +219,16 @@ class MapFountains extends React.PureComponent<{}, State> {
   }
 
   addAmenitiesMarkers = (nodes: OpenStreetMapNode[]) => {
-    map<mapboxgl.Map, void>(map => {
-      nodes.forEach(node => {
+    this.getMap(map => {
+      const amenitiesMapOrder: { [k in Amenity]: number } = {
+        drinking_water: 1,
+        shower: 2,
+        toilets: 3,
+        public_bath: 4,
+        bicycle_repair_station: 5
+      };
+
+      sortBy(nodes, a => amenitiesMapOrder[a.tags.amenity]).forEach(node => {
         if (!this.nodes[node.id]) {
           const element = document.createElement("div");
 
@@ -244,11 +257,11 @@ class MapFountains extends React.PureComponent<{}, State> {
           };
         }
       });
-    })(this.map);
+    });
   };
 
   showRadius() {
-    map<mapboxgl.Map, void>(map => {
+    this.getMap(map => {
       const center = {
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
@@ -265,7 +278,7 @@ class MapFountains extends React.PureComponent<{}, State> {
           fillColor: "transparent"
         }).addTo(map);
       }
-    })(this.map);
+    });
   }
 
   hideRadius() {
@@ -301,7 +314,7 @@ class MapFountains extends React.PureComponent<{}, State> {
 
   componentDidUpdate() {
     requestAnimationFrame(() => {
-      map<mapboxgl.Map, void>(map => map.resize())(this.map);
+      this.getMap(map => map.resize());
     });
   }
 
@@ -330,13 +343,13 @@ class MapFountains extends React.PureComponent<{}, State> {
           onChange={show => {
             this.updateFilter(amenity, show);
 
-            map<mapboxgl.Map, void>(map => {
+            this.getMap(map => {
               if (show) {
                 this.amenityNodes(amenity).forEach(v => v.marker.addTo(map));
               } else {
                 this.amenityNodes(amenity).forEach(v => v.marker.remove());
               }
-            })(this.map);
+            });
           }}
         />
       )
@@ -368,12 +381,12 @@ class MapFountains extends React.PureComponent<{}, State> {
             vAlignContent="center"
             hAlignContent="center"
             onClick={() => {
-              map<mapboxgl.Map, void>(map => {
+              this.getMap(map => {
                 this.previousCenter = map.getCenter();
                 this.updateAmenities();
 
                 this.setState({ showSearchThisAreaButton: false });
-              })(this.map);
+              });
             }}
           >
             Search this area
