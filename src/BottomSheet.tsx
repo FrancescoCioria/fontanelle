@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { BottomSheet, BottomSheetRef } from "react-spring-bottom-sheet";
-import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
+import {
+  getAmenityMarker,
+  getAmenityTitle,
+  OpenStreetMapNode
+} from "./getOpenStreetMapAmenities";
 import View from "react-flexview";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
@@ -56,35 +60,6 @@ export default (props: Props) => {
     return "white";
   };
 
-  const icon = (): JSX.Element => {
-    switch (props.node.tags.amenity) {
-      case "drinking_water":
-        return (
-          <View vAlignContent="center">
-            <DrinkingWaterMarker size={48} />
-
-            <span style={{ marginLeft: 16, fontSize: 24 }}>Drinking Water</span>
-          </View>
-        );
-
-      case "toilets":
-        return (
-          <View vAlignContent="center">
-            <PublicToiletsMarker color={color(props.node.tags)} size={48} />
-            <span style={{ marginLeft: 16, fontSize: 24 }}>Public Toilets</span>
-          </View>
-        );
-
-      case "shower":
-        return (
-          <View vAlignContent="center">
-            <PublicShowerMarker color={color(props.node.tags)} size={48} />
-            <span style={{ marginLeft: 16, fontSize: 24 }}>Public Shower</span>
-          </View>
-        );
-    }
-  };
-
   const openUrl = (url: string) => window.open(url, "_blank");
 
   return (
@@ -106,7 +81,12 @@ export default (props: Props) => {
         shrink={false}
         style={{ padding: 32, paddingTop: 12, minHeight: "35vh" }}
       >
-        {icon()}
+        <View vAlignContent="center">
+          {getAmenityMarker(props.node.tags, 48)}
+          <span style={{ marginLeft: 16, fontSize: 24 }}>
+            {getAmenityTitle(props.node.tags.amenity)}
+          </span>
+        </View>
 
         <View
           style={{

@@ -2,7 +2,7 @@ import * as React from "react";
 import View from "react-flexview";
 
 export const Popup = (props: {
-  children: JSX.Element | false | null | Array<JSX.Element | false | null>;
+  children: View.Props["children"];
   onClose: () => void;
   isOpen: boolean;
   style?: React.CSSProperties;

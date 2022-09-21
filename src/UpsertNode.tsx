@@ -1,7 +1,10 @@
 import * as React from "react";
 import View from "react-flexview";
 import { Popup } from "./Popup";
-import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
+import {
+  getAmenityTitle,
+  OpenStreetMapNode
+} from "./getOpenStreetMapAmenities";
 import { osmAuth, osmCreateNode, osmUpdateNode } from "./osm";
 import { Select, Input, Button } from "./form";
 
@@ -74,7 +77,8 @@ export const UpsertNodePopup = (props: Props) => {
         />
 
         {(node.tags.amenity === "toilets" ||
-          node.tags.amenity === "shower") && (
+          node.tags.amenity === "shower" ||
+          node.tags.amenity === "public_bath") && (
           <Select
             value={node.tags.access === "public" ? "yes" : node.tags.access}
             label="Access"
@@ -89,7 +93,8 @@ export const UpsertNodePopup = (props: Props) => {
         )}
 
         {(node.tags.amenity === "toilets" ||
-          node.tags.amenity === "shower") && (
+          node.tags.amenity === "shower" ||
+          node.tags.amenity === "public_bath") && (
           <Select
             value={node.tags.fee}
             label="Fee"
@@ -102,7 +107,9 @@ export const UpsertNodePopup = (props: Props) => {
           />
         )}
 
-        {(node.tags.amenity === "toilets" || node.tags.amenity === "shower") &&
+        {(node.tags.amenity === "toilets" ||
+          node.tags.amenity === "shower" ||
+          node.tags.amenity === "public_bath") &&
         node.tags.fee === "yes" ? (
           <Input
             value={node.tags.charge}
@@ -168,17 +175,6 @@ export const UpsertNodePopup = (props: Props) => {
         )}
       </View>
     );
-  };
-
-  const getTitle = (): string => {
-    switch (props.node.tags.amenity) {
-      case "drinking_water":
-        return "Drinking Water";
-      case "toilets":
-        return "Toilets";
-      case "shower":
-        return "Shower";
-    }
   };
 
   if (osmAuth.authenticated()) {
@@ -268,7 +264,9 @@ export const UpsertNodePopup = (props: Props) => {
       case "update": {
         return (
           <Popup onClose={props.onClose} isOpen={true}>
-            <h2 style={{ margin: 0, textAlign: "center" }}>{getTitle()}</h2>
+            <h2 style={{ margin: 0, textAlign: "center" }}>
+              {getAmenityTitle(props.node.tags.amenity)}
+            </h2>
 
             <View style={{ margin: "16px 0 24px" }} className="separator" />
 
