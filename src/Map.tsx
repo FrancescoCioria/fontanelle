@@ -58,7 +58,8 @@ class MapFountains extends React.PureComponent<{}, State> {
       toilets: true,
       shower: true,
       bicycle_repair_station: true,
-      public_bath: true
+      public_bath: true,
+      device_charging_station: true
     },
     continousSearch: false,
     showSearchThisAreaButton: false
@@ -172,67 +173,79 @@ class MapFountains extends React.PureComponent<{}, State> {
     mapboxgl.accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(e => {
-        const map = new mapboxgl.Map({
-          container: "map",
-          style:
-            "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
-          center: {
-            lat: e.coords.latitude,
-            lng: e.coords.longitude
+    const positionCallback = (coords: {
+      latitude: number;
+      longitude: number;
+    }) => {
+      const map = new mapboxgl.Map({
+        container: "map",
+        style:
+          "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
+        center: {
+          lat: coords.latitude,
+          lng: coords.longitude
+        },
+        zoom: 15.0,
+        scrollZoom:
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent
+          )
+            ? false
+            : true
+      });
+
+      map.addControl(
+        new mapboxgl.GeolocateControl({
+          positionOptions: {
+            enableHighAccuracy: true
           },
-          zoom: 15.0,
-          scrollZoom:
-            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-              navigator.userAgent
-            )
-              ? false
-              : true
-        });
+          trackUserLocation: false
+        }),
+        "bottom-right"
+      );
 
-        map.addControl(
-          new mapboxgl.GeolocateControl({
-            positionOptions: {
-              enableHighAccuracy: true
-            },
-            trackUserLocation: true
-          }),
-          "bottom-right"
-        );
+      map.addControl(
+        new mapboxgl.NavigationControl({
+          showZoom: false,
+          showCompass: true
+        }),
+        "bottom-right"
+      );
 
-        map.addControl(
-          new mapboxgl.NavigationControl({
-            showZoom: false,
-            showCompass: true
-          }),
-          "bottom-right"
-        );
+      map.addControl(new mapboxgl.ScaleControl());
 
-        map.addControl(new mapboxgl.ScaleControl());
+      map.on("load", () => {
+        this.map = some(map);
 
-        map.on("load", () => {
-          this.map = some(map);
+        this.updateAmenities();
 
-          this.updateAmenities();
+        (
+          document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
+        )?.click();
+      });
 
-          (
-            document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
-          )?.click();
-        });
+      map.on("move", () => {
+        this.updateAmenitiesDebounce();
 
-        map.on("move", () => {
-          this.updateAmenitiesDebounce();
+        requestAnimationFrame(() => {
+          if (this.state.showRadius) {
+            this.showRadius();
+          }
 
-          requestAnimationFrame(() => {
-            if (this.state.showRadius) {
-              this.showRadius();
-            }
-
-            this.updateMarkersThrottle();
-          });
+          this.updateMarkersThrottle();
         });
       });
+    };
+
+    const defaultCoordinates = { latitude: 45.4642, longitude: 9.19 };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        e => positionCallback(e.coords),
+        () => positionCallback(defaultCoordinates)
+      );
+    } else {
+      positionCallback(defaultCoordinates);
     }
   }
 
@@ -245,7 +258,8 @@ class MapFountains extends React.PureComponent<{}, State> {
         shower: 2,
         toilets: 3,
         public_bath: 4,
-        bicycle_repair_station: 5
+        device_charging_station: 5,
+        bicycle_repair_station: 6
       };
 
       sortBy(nodes, a => amenitiesMapOrder[a.tags.amenity]).forEach(node => {

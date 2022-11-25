@@ -5,6 +5,7 @@ import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
 import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
+import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import OpeningHours from "opening_hours";
 
 import "localforage-getitems";
@@ -42,6 +43,9 @@ type AmenityTags = { mapillary?: string } & (
   | {
       amenity: "bicycle_repair_station";
     }
+  | {
+      amenity: "device_charging_station";
+    }
 );
 
 export type OpenStreetMapNode = {
@@ -56,7 +60,8 @@ const amenitiesMap: { [k in Amenity]: Amenity } = {
   shower: "shower",
   toilets: "toilets",
   public_bath: "public_bath",
-  bicycle_repair_station: "bicycle_repair_station"
+  bicycle_repair_station: "bicycle_repair_station",
+  device_charging_station: "device_charging_station"
 };
 
 export const amenities = Object.values(amenitiesMap);
@@ -151,6 +156,8 @@ export const getAmenityMarker = (
       return <BicycleRepairStationMarker size={size} />;
     case "public_bath":
       return <PublicBathMarker size={size} color={color()} />;
+    case "device_charging_station":
+      return <DeviceChargingStationMarker size={size} />;
   }
 };
 
@@ -166,5 +173,7 @@ export const getAmenityTitle = (amenity: Amenity): string => {
       return "Bicycle Repair Station";
     case "public_bath":
       return "Public Bath";
+    case "device_charging_station":
+      return "Phone Charging Station";
   }
 };
