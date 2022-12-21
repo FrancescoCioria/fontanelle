@@ -1,5 +1,6 @@
 import * as localforage from "localforage";
 import uniqBy from "lodash/uniqBy";
+import flatten from "lodash/flatten";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
@@ -85,24 +86,34 @@ export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
 };
 
 export default async (options: Options): Promise<OpenStreetMapNode[]> => {
-  const formData = `
-    [out:json];
-    (node["amenity"~"${amenities.join("|")}"](around:${options.around},${
-    options.lat
-  },${options.lng}););
-    out;>;out;
-  `;
+  const res = await Promise.all(
+    [
+      amenities.slice(0, amenities.length / 2),
+      amenities.slice(amenities.length / 2)
+    ].map(async amenitiesGroup => {
+      const formData = `
+        [out:json];
+        (node["amenity"~"${amenitiesGroup.join("|")}"](around:${
+        options.around
+      },${options.lat},${options.lng}););
+        out;>;out;
+      `;
 
-  // const OverpassApiService = 'https://overpass-api.de/api/interpreter'
-  const OverpassApiService = "https://overpass.kumi.systems/api/interpreter";
+      // const OverpassApiService = 'https://overpass-api.de/api/interpreter'
+      const OverpassApiService =
+        "https://overpass.kumi.systems/api/interpreter";
 
-  const res = await fetch(`${OverpassApiService}?data=${formData}&output`);
+      const res = await fetch(`${OverpassApiService}?data=${formData}&output`);
 
-  const json: { elements: OpenStreetMapNode[] } = await res.json();
+      const json: { elements: OpenStreetMapNode[] } = await res.json();
 
-  updateCachedItems(json.elements);
+      updateCachedItems(json.elements);
 
-  return json.elements;
+      return json.elements;
+    })
+  );
+
+  return flatten(res);
 };
 
 export const getAmenityMarker = (
