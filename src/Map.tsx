@@ -199,7 +199,8 @@ class MapFountains extends React.PureComponent<{}, State> {
           positionOptions: {
             enableHighAccuracy: true
           },
-          trackUserLocation: false
+          showAccuracyCircle: true,
+          trackUserLocation: true
         }),
         "bottom-right"
       );
@@ -439,23 +440,24 @@ class MapFountains extends React.PureComponent<{}, State> {
           />
         )}
 
-        {this.state.showSearchThisAreaButton && this.state.openedNode === null && (
-          <View
-            className="search-this-area-button"
-            vAlignContent="center"
-            hAlignContent="center"
-            onClick={() => {
-              this.getMap(map => {
-                this.previousCenter = map.getCenter();
-                this.updateAmenities();
+        {this.state.showSearchThisAreaButton &&
+          this.state.openedNode === null && (
+            <View
+              className="search-this-area-button"
+              vAlignContent="center"
+              hAlignContent="center"
+              onClick={() => {
+                this.getMap(map => {
+                  this.previousCenter = map.getCenter();
+                  this.updateAmenities();
 
-                this.setState({ showSearchThisAreaButton: false });
-              });
-            }}
-          >
-            Search this area
-          </View>
-        )}
+                  this.setState({ showSearchThisAreaButton: false });
+                });
+              }}
+            >
+              Search this area
+            </View>
+          )}
 
         {this.state.upsertNode && isSome(this.map) && (
           <UpsertNodePopup
