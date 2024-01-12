@@ -1,26 +1,14 @@
 {
   "files": {
-    "main.css": "/fontanelle/static/css/main.f2993225.chunk.css",
-    "main.js": "/fontanelle/static/js/main.0c61ce21.chunk.js",
-    "main.js.map": "/fontanelle/static/js/main.0c61ce21.chunk.js.map",
-    "runtime-main.js": "/fontanelle/static/js/runtime-main.687bb97a.js",
-    "runtime-main.js.map": "/fontanelle/static/js/runtime-main.687bb97a.js.map",
-    "static/css/2.9c5eef5f.chunk.css": "/fontanelle/static/css/2.9c5eef5f.chunk.css",
-    "static/js/2.1f1aa465.chunk.js": "/fontanelle/static/js/2.1f1aa465.chunk.js",
-    "static/js/2.1f1aa465.chunk.js.map": "/fontanelle/static/js/2.1f1aa465.chunk.js.map",
-    "index.html": "/fontanelle/index.html",
+    "main.css": "/fontanelle/static/css/main.bd117a3c.css",
+    "main.js": "/fontanelle/static/js/main.4f72d066.js",
     "service-worker.js": "/fontanelle/service-worker.js",
-    "service-worker.js.LICENSE.txt": "/fontanelle/service-worker.js.LICENSE.txt",
-    "service-worker.js.map": "/fontanelle/service-worker.js.map",
-    "static/css/2.9c5eef5f.chunk.css.map": "/fontanelle/static/css/2.9c5eef5f.chunk.css.map",
-    "static/css/main.f2993225.chunk.css.map": "/fontanelle/static/css/main.f2993225.chunk.css.map",
-    "static/js/2.1f1aa465.chunk.js.LICENSE.txt": "/fontanelle/static/js/2.1f1aa465.chunk.js.LICENSE.txt"
+    "index.html": "/fontanelle/index.html",
+    "main.bd117a3c.css.map": "/fontanelle/static/css/main.bd117a3c.css.map",
+    "main.4f72d066.js.map": "/fontanelle/static/js/main.4f72d066.js.map"
   },
   "entrypoints": [
-    "static/js/runtime-main.687bb97a.js",
-    "static/css/2.9c5eef5f.chunk.css",
-    "static/js/2.1f1aa465.chunk.js",
-    "static/css/main.f2993225.chunk.css",
-    "static/js/main.0c61ce21.chunk.js"
+    "static/css/main.bd117a3c.css",
+    "static/js/main.4f72d066.js"
   ]
 }
