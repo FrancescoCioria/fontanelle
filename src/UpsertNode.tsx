@@ -5,7 +5,7 @@ import {
   getAmenityTitle,
   OpenStreetMapNode
 } from "./getOpenStreetMapAmenities";
-import { osmAuth, osmCreateNode, osmUpdateNode } from "./osm";
+import { osmAuth, osmCreateNode, osmDeleteNode, osmUpdateNode } from "./osm";
 import { Select, Input, Button } from "./form";
 
 export type UpsertNode =
@@ -29,7 +29,10 @@ export type UpsertNode =
 type Props = {
   map: mapboxgl.Map;
   onClose: () => void;
-  onDone: (node: OpenStreetMapNode) => void;
+  onDone: (
+    node: OpenStreetMapNode,
+    action: "create" | "update" | "delete"
+  ) => void;
 } & UpsertNode;
 
 export const UpsertNodePopup = (props: Props) => {
@@ -283,13 +286,37 @@ export const UpsertNodePopup = (props: Props) => {
               onClick={() => {
                 if (state.type === "create") {
                   // create
-                  osmCreateNode({ ...state.node }).then(props.onDone);
+                  osmCreateNode({ ...state.node }).then(n =>
+                    props.onDone(n, "create")
+                  );
                 } else {
                   // update
-                  osmUpdateNode({ ...state.node }).then(props.onDone);
+                  osmUpdateNode({ ...state.node }).then(n =>
+                    props.onDone(n, "update")
+                  );
                 }
               }}
             />
+
+            {state.type === "update" && (
+              <>
+                <View style={{ marginTop: 32 }} className="separator" />
+
+                <Button
+                  label="Delete Node"
+                  style={{
+                    marginTop: 24,
+                    background: "#f44336",
+                    color: "white"
+                  }}
+                  onClick={() => {
+                    osmDeleteNode({ ...state.node }).then(n =>
+                      props.onDone(n, "delete")
+                    );
+                  }}
+                />
+              </>
+            )}
           </Popup>
         );
       }

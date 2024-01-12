@@ -466,7 +466,10 @@ class MapFountains extends React.PureComponent<{}, State> {
             onClose={() => {
               this.setState({ upsertNode: null });
             }}
-            onDone={(node: OpenStreetMapNode) => {
+            onDone={(
+              node: OpenStreetMapNode,
+              action: "create" | "update" | "delete"
+            ) => {
               if (this.nodes[node.id]) {
                 // remove marker
                 this.nodes[node.id].marker.remove();
@@ -475,11 +478,13 @@ class MapFountains extends React.PureComponent<{}, State> {
                 delete this.nodes[node.id];
               }
 
-              // show updated/created node
-              this.addAmenitiesMarkers([node]);
+              if (action === "create" || action === "update") {
+                // show updated/created node
+                this.addAmenitiesMarkers([node]);
 
-              // fire&forget
-              updateCachedItems([node]);
+                // fire&forget
+                updateCachedItems([node]);
+              }
 
               this.setState({ upsertNode: null });
             }}

@@ -54,6 +54,18 @@ const osmPut = <R>(options: {
   });
 };
 
+const osmDelete = <R>(options: {
+  path: string;
+  content: { osm?: { [k in "node" | "changeset"]?: object } };
+}) => {
+  return osmApi<R>({
+    method: "DELETE",
+    path: options.path,
+    headers: { "Content-Type": "text/xml" },
+    content: xmlBuilder.buildObject(options.content)
+  });
+};
+
 const wrapInChangeset = async <R>(
   changesetComment: string,
   mutation: (changesetId: string) => Promise<R>
@@ -74,6 +86,43 @@ const wrapInChangeset = async <R>(
   });
 
   return res;
+};
+
+export const osmDeleteNode = async (
+  node: OpenStreetMapNode
+): Promise<OpenStreetMapNode> => {
+  await wrapInChangeset(
+    `Delete "${node.tags.amenity}" amenity`,
+    async changesetId => {
+      const {
+        elements: [fetchedNode]
+      } = await osmGet<{ elements: [OpenStreetMapNode & { version: number }] }>(
+        {
+          path: `/api/0.6/node/${node.id}`
+        }
+      );
+
+      osmDelete({
+        path: `/api/0.6/node/${node.id}`,
+
+        content: {
+          osm: {
+            node: {
+              $: {
+                changeset: changesetId,
+                id: node.id,
+                lat: node.lat,
+                lon: node.lon,
+                version: fetchedNode.version
+              }
+            }
+          }
+        }
+      });
+    }
+  );
+
+  return node;
 };
 
 export const osmUpdateNode = async (
