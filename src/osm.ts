@@ -1,8 +1,9 @@
 import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
-import localforage from "localforage";
+// import localforage from "localforage";
+import { osmAuth as _osmAuth } from "osm-auth";
 
 // import type OsmAuth from "osm-auth";
-const _osmAuth = require("osm-auth").osmAuth; // CJS named import
+// const _osmAuth = require("osm-auth").osmAuth; // CJS named import
 
 import { Builder } from "xml2js";
 
