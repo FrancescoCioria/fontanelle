@@ -199,6 +199,7 @@ class MapFountains extends React.PureComponent<{}, State> {
           positionOptions: {
             enableHighAccuracy: true
           },
+          showUserHeading: true,
           showAccuracyCircle: true,
           trackUserLocation: true
         }),
