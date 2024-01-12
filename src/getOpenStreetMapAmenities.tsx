@@ -99,9 +99,9 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
         out;>;out;
       `;
 
-      // const OverpassApiService = 'https://overpass-api.de/api/interpreter'
-      const OverpassApiService =
-        "https://overpass.kumi.systems/api/interpreter";
+      const OverpassApiService = "https://overpass-api.de/api/interpreter";
+      // const OverpassApiService =
+      //   "https://overpass.kumi.systems/api/interpreter";
 
       const res = await fetch(`${OverpassApiService}?data=${formData}&output`);
 
