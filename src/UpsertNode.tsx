@@ -303,7 +303,7 @@ export const UpsertNodePopup = (props: Props) => {
                 <View style={{ marginTop: 32 }} className="separator" />
 
                 <Button
-                  label="Delete Node"
+                  label="Delete from OSM"
                   style={{
                     marginTop: 24,
                     background: "#f44336",
