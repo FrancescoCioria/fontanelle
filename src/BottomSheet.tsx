@@ -53,10 +53,14 @@ const mapFileImage = (v: any) =>
 export default (props: Props) => {
   const [isOpen, updateOpen] = useState(true);
 
+  const [fetchedNode, updateFetchedNode] = useState<
+    (OpenStreetMapNode & { timestamp: string; user: string }) | null
+  >(null);
+
   useEffect(() => {
     updateOpen(true);
     osmGetNode(props.node)
-      .then(res => console.log(res))
+      .then(res => updateFetchedNode(res))
       .catch(() => {});
   }, [props.node]);
 
@@ -122,6 +126,11 @@ export default (props: Props) => {
             }}
           />
         </View>
+
+        {fetchedNode && (
+          <Amenity label="Creation date" value={fetchedNode.timestamp} />
+        )}
+        {fetchedNode && <Amenity label="Created by" value={fetchedNode.user} />}
 
         {Object.keys(props.node.tags).map(k => (
           <Amenity

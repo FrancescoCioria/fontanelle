@@ -1,4 +1,7 @@
-import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
+import {
+  OpenStreetMapNode,
+  updateCachedItems
+} from "./getOpenStreetMapAmenities";
 // import localforage from "localforage";
 import { osmAuth as _osmAuth } from "osm-auth";
 
@@ -209,9 +212,11 @@ export const osmCreateNode = async (
 export const osmGetNode = async (node: OpenStreetMapNode) => {
   const {
     elements: [fetchedNode]
-  } = await osmGet<{ elements: [OpenStreetMapNode & { version: number }] }>({
-    path: `/api/0.6/node/${node.id}`
-  });
+  } = await fetch(
+    `https://www.openstreetmap.org/api/0.6/node/${node.id}.json`
+  ).then(res => res.json());
+
+  updateCachedItems([fetchedNode]);
 
   return fetchedNode;
 };
