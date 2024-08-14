@@ -12,14 +12,28 @@ import capitalize from "lodash/capitalize";
 import "react-spring-bottom-sheet/dist/style.css";
 
 const Amenity = (props: { label: string; value: string }): JSX.Element => {
+  const clickable = props.value.startsWith("https://");
   return (
     <View style={{ marginTop: 16 }} column>
       <span style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>
         {capitalize(props.label)}
       </span>
-      <span style={{ fontSize: 18, wordBreak: "break-all" }}>
-        {props.value}
-      </span>
+      {clickable ? (
+        <a
+          href={props.value}
+          target="_blank"
+          style={{ fontSize: 18, wordBreak: "break-all", color: "black" }}
+        >
+          {props.value}
+        </a>
+      ) : (
+        <span
+          style={{ fontSize: 18, wordBreak: "break-all" }}
+          onClick={() => clickable && window.open(props.value, "_blank")}
+        >
+          {props.value}
+        </span>
+      )}
     </View>
   );
 };
@@ -29,6 +43,11 @@ type Props = {
   onDismiss: () => void;
   onEditNode: (node: OpenStreetMapNode) => void;
 };
+
+const mapFileImage = (v: any) =>
+  typeof v === "string" && v.startsWith("File:")
+    ? `https://commons.wikimedia.org/wiki/${v.replaceAll(" ", "_")}`
+    : v;
 
 export default (props: Props) => {
   const [isOpen, updateOpen] = useState(true);
@@ -101,7 +120,11 @@ export default (props: Props) => {
         </View>
 
         {Object.keys(props.node.tags).map(k => (
-          <Amenity key={k} label={k} value={props.node.tags[k as never]} />
+          <Amenity
+            key={k}
+            label={k}
+            value={mapFileImage(props.node.tags[k as never])}
+          />
         ))}
       </View>
     </BottomSheet>
