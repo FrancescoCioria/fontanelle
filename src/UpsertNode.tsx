@@ -79,6 +79,16 @@ export const UpsertNodePopup = (props: Props) => {
           }}
         />
 
+        <Select
+          value={node.tags.indoor}
+          label="Indoor"
+          onChange={v => editNodeTag("indoor", v)}
+          options={[
+            { value: "yes", label: "Yes" },
+            { value: "no", label: "No" }
+          ]}
+        />
+
         {(node.tags.amenity === "toilets" ||
           node.tags.amenity === "shower" ||
           node.tags.amenity === "public_bath") && (
@@ -173,6 +183,19 @@ export const UpsertNodePopup = (props: Props) => {
               { value: "yes", label: "Yes" },
               { value: "no", label: "No" },
               { value: "limited", label: "Limited" }
+            ]}
+          />
+        )}
+
+        {node.tags.amenity === "toilets" && (
+          <Select
+            value={node.tags.disposal}
+            label="Disposal"
+            onChange={v => editNodeTag("disposal", v)}
+            options={[
+              { value: "flush", label: "Flush" },
+              { value: "chemical", label: "Chemical" },
+              { value: "pitlatrine", label: "Pit latrine" }
             ]}
           />
         )}

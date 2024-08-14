@@ -14,6 +14,7 @@ import "localforage-getitems";
 type AmenityTags = { mapillary?: string } & (
   | {
       amenity: "drinking_water";
+      indoor?: "yes" | "no";
     }
   | {
       amenity: "toilets";
@@ -24,6 +25,8 @@ type AmenityTags = { mapillary?: string } & (
       wheelchair?: "yes" | "no" | "unknown" | "limited";
       unisex?: "yes" | "male" | "female";
       opening_hours?: string;
+      disposal?: "flush" | "chemical" | "pitlatrine";
+      indoor?: "yes" | "no";
     }
   | {
       amenity: "shower";
@@ -33,6 +36,7 @@ type AmenityTags = { mapillary?: string } & (
       charge?: string;
       wheelchair?: "yes" | "no" | "unknown" | "limited";
       opening_hours?: string;
+      indoor?: "yes" | "no";
     }
   | {
       amenity: "public_bath";
@@ -40,12 +44,15 @@ type AmenityTags = { mapillary?: string } & (
       fee?: "yes" | "no" | "unknown";
       charge?: string;
       opening_hours?: string;
+      indoor?: "yes" | "no";
     }
   | {
       amenity: "bicycle_repair_station";
+      indoor?: "yes" | "no";
     }
   | {
       amenity: "device_charging_station";
+      indoor?: "yes" | "no";
     }
 );
 
