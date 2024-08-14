@@ -8,6 +8,7 @@ import {
 import View from "react-flexview";
 import { Button } from "./form";
 import capitalize from "lodash/capitalize";
+import { osmGetNode } from "./osm";
 
 import "react-spring-bottom-sheet/dist/style.css";
 
@@ -54,6 +55,9 @@ export default (props: Props) => {
 
   useEffect(() => {
     updateOpen(true);
+    osmGetNode(props.node)
+      .then(res => console.log(res))
+      .catch(() => {});
   }, [props.node]);
 
   const openUrl = (url: string) => window.open(url, "_blank");

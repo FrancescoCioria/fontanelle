@@ -205,3 +205,13 @@ export const osmCreateNode = async (
     id: parseInt(nodeId)
   };
 };
+
+export const osmGetNode = async (node: OpenStreetMapNode) => {
+  const {
+    elements: [fetchedNode]
+  } = await osmGet<{ elements: [OpenStreetMapNode & { version: number }] }>({
+    path: `/api/0.6/node/${node.id}`
+  });
+
+  return fetchedNode;
+};

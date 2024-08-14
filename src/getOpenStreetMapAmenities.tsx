@@ -93,7 +93,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
     ].map(async amenitiesGroup => {
       const formData = `
         [out:json];
-        (node["amenity"~"${amenitiesGroup.join("|")}"](around:${
+        (nwr["amenity"~"${amenitiesGroup.join("|")}"](around:${
         options.around
       },${options.lat},${options.lng}););
         out;>;out;
