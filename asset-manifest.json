@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/fontanelle/static/css/main.bd117a3c.css",
-    "main.js": "/fontanelle/static/js/main.1491ba60.js",
+    "main.js": "/fontanelle/static/js/main.731874dd.js",
     "service-worker.js": "/fontanelle/service-worker.js",
     "index.html": "/fontanelle/index.html",
     "main.bd117a3c.css.map": "/fontanelle/static/css/main.bd117a3c.css.map",
-    "main.1491ba60.js.map": "/fontanelle/static/js/main.1491ba60.js.map"
+    "main.731874dd.js.map": "/fontanelle/static/js/main.731874dd.js.map"
   },
   "entrypoints": [
     "static/css/main.bd117a3c.css",
-    "static/js/main.1491ba60.js"
+    "static/js/main.731874dd.js"
   ]
 }
