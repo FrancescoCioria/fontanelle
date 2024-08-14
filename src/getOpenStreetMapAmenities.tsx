@@ -25,7 +25,7 @@ type AmenityTags = { mapillary?: string } & (
       wheelchair?: "yes" | "no" | "unknown" | "limited";
       unisex?: "yes" | "male" | "female";
       opening_hours?: string;
-      disposal?: "flush" | "chemical" | "pitlatrine";
+      "toilets:disposal"?: "flush" | "chemical" | "pitlatrine";
       indoor?: "yes" | "no";
     }
   | {

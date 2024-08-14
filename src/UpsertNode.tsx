@@ -189,9 +189,9 @@ export const UpsertNodePopup = (props: Props) => {
 
         {node.tags.amenity === "toilets" && (
           <Select
-            value={node.tags.disposal}
+            value={node.tags["toilets:disposal"]}
             label="Disposal"
-            onChange={v => editNodeTag("disposal", v)}
+            onChange={v => editNodeTag("toilets:disposal", v)}
             options={[
               { value: "flush", label: "Flush" },
               { value: "chemical", label: "Chemical" },

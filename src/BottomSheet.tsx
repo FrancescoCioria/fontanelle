@@ -17,7 +17,7 @@ const Amenity = (props: { label: string; value: string }): JSX.Element => {
   return (
     <View style={{ marginTop: 16 }} column>
       <span style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>
-        {capitalize(props.label)}
+        {capitalize(props.label.replace("toilets:", ""))}
       </span>
       {clickable ? (
         <a
