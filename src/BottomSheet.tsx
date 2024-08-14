@@ -128,7 +128,7 @@ export default (props: Props) => {
         </View>
 
         {fetchedNode && (
-          <Amenity label="Creation date" value={fetchedNode.timestamp} />
+          <Amenity label="Last update" value={fetchedNode.timestamp} />
         )}
         {fetchedNode && <Amenity label="Created by" value={fetchedNode.user} />}
 
