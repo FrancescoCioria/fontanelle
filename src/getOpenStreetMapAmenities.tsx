@@ -116,7 +116,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
 
       updateCachedItems(json.elements);
 
-      return json.elements;
+      return json.elements.filter(v => v.tags);
     })
   );
 
