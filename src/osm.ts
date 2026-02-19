@@ -20,7 +20,7 @@ export const osmAuth = new _osmAuth({
 });
 
 const osmApi = <R>(options: {
-  method: string;
+  method: "GET" | "PUT" | "DELETE" | "POST";
   path: string;
   headers?: { [k: string]: string };
   content?: string;

@@ -1,18 +1,17 @@
 import React, { FC, useEffect } from "react";
 import * as serviceWorker from "./serviceWorkerRegistration";
 import View from "react-flexview";
-import { none, Option, fromNullable, map } from "fp-ts/lib/Option";
 
 // Learn more about service workers: https://bit.ly/CRA-PWA
 
 const ServiceWorkerWrapper: FC = () => {
   const [showReload, setShowReload] = React.useState(false);
   const [waitingWorker, setWaitingWorker] =
-    React.useState<Option<ServiceWorker>>(none);
+    React.useState<ServiceWorker | null>(null);
 
   const onSWUpdate = (registration: ServiceWorkerRegistration) => {
     setShowReload(true);
-    setWaitingWorker(fromNullable(registration.waiting));
+    setWaitingWorker(registration.waiting);
   };
 
   useEffect(() => {
@@ -21,9 +20,7 @@ const ServiceWorkerWrapper: FC = () => {
 
   const reloadPage = () => {
     console.log("reload page");
-    map<ServiceWorker, void>(ww => ww.postMessage({ type: "SKIP_WAITING" }))(
-      waitingWorker
-    );
+    waitingWorker?.postMessage({ type: "SKIP_WAITING" });
     setShowReload(false);
     window.location.reload();
   };

@@ -89,7 +89,7 @@ Ogni amenity è un `mapboxgl.Marker` DOM con virtualizzazione manuale (show/hide
 ---
 
 ## 5. Rimuovere `fp-ts` Option
-**Stato: TODO**
+**Stato: Done**
 
 `fp-ts` è una dipendenza pesante (~150KB pre-treeshake), usata solo per `Option<mapboxgl.Map>` in `Map.tsx` e `Option<ServiceWorker>` in `ServiceWorkerWrapper.tsx`.
 
