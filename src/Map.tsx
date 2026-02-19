@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useMemo } from "react";
 import debounce from "lodash/debounce";
-import View from "react-flexview";
 import getOpenStreetMapAmenities, {
   OpenStreetMapNode,
   updateCachedItems,
@@ -439,20 +438,30 @@ function MapFountains() {
   ));
 
   return (
-    <View style={{ height: "100%", width: "100%" }} column>
-      <View>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        width: "100%"
+      }}
+    >
+      <div style={{ display: "flex" }}>
         <LoadingBar ref={loadingBarRef} color="lightgreen" height={8} />
-      </View>
+      </div>
 
-      <View grow id="map" />
+      <div id="map" style={{ display: "flex", flexGrow: 1 }} />
 
       {openedNode && <BottomSheet />}
 
       {showSearchThisAreaButton && openedNode === null && (
-        <View
+        <div
           className="search-this-area-button"
-          vAlignContent="center"
-          hAlignContent="center"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
           onClick={() => {
             getMap(map => {
               previousCenterRef.current = map.getCenter();
@@ -463,7 +472,7 @@ function MapFountains() {
           }}
         >
           Search this area
-        </View>
+        </div>
       )}
 
       {upsertNode && mapRef.current && (
@@ -486,11 +495,14 @@ function MapFountains() {
         />
       )}
 
-      <View
+      <div
         className="menu-button"
-        hAlignContent="center"
-        vAlignContent="center"
-        style={openedNode ? { zIndex: 2 } : undefined}
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          ...(openedNode ? { zIndex: 2 } : {})
+        }}
         onClick={() => setIsMenuOpen(true)}
       >
         <MenuIcon />
@@ -527,7 +539,7 @@ function MapFountains() {
             }}
           />
 
-          <View height={24} />
+          <div style={{ height: 24 }} />
 
           <Checkbox
             value={showRadius}
@@ -554,12 +566,12 @@ function MapFountains() {
             }}
           />
 
-          <View className="separator" />
+          <div className="separator" />
 
           <h4 style={{ marginBottom: 8 }}>Filters</h4>
           {filterCheckboxes}
 
-          <View className="separator" />
+          <div className="separator" />
 
           <h4>Add new amenity (OSM account required)</h4>
           {amenities.map((amenity, i) => (
@@ -579,7 +591,7 @@ function MapFountains() {
             />
           ))}
         </Popup>
-      </View>
+      </div>
 
       {errorMessage && (
         <Toast
@@ -587,7 +599,7 @@ function MapFountains() {
           onDismiss={() => setErrorMessage(null)}
         />
       )}
-    </View>
+    </div>
   );
 }
 

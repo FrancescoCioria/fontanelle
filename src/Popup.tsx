@@ -1,36 +1,35 @@
 import * as React from "react";
-import View from "react-flexview";
 
 export const Popup = (props: {
-  children: View.Props["children"];
+  children: React.ReactNode;
   onClose: () => void;
   isOpen: boolean;
   style?: React.CSSProperties;
 }) => {
   return (
-    <View
+    <div
       className="popup"
       style={{
         ...props.style,
-        display: props.isOpen ? "flex" : "none"
+        display: props.isOpen ? "flex" : "none",
+        justifyContent: "center",
+        alignItems: "center",
+        flexShrink: 0
       }}
-      hAlignContent="center"
-      vAlignContent="center"
       onClick={e => {
         e.stopPropagation();
         props.onClose();
       }}
-      shrink={false}
     >
-      <View
+      <div
         className="popup-content"
-        column
+        style={{ display: "flex", flexDirection: "column" }}
         onClick={e => {
           e.stopPropagation();
         }}
       >
         {props.children}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 };

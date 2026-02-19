@@ -1,5 +1,4 @@
 import * as React from "react";
-import View from "react-flexview";
 
 type Option<V extends string> = {
   value: V | null;
@@ -13,7 +12,10 @@ export const Select = <V extends string>(props: {
   options: Option<V>[];
 }) => {
   return (
-    <View column className="select" shrink={false}>
+    <div
+      className="select"
+      style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}
+    >
       <span className="select-label">{props.label}</span>
       <select
         value={props.value}
@@ -26,7 +28,7 @@ export const Select = <V extends string>(props: {
           </option>
         ))}
       </select>
-    </View>
+    </div>
   );
 };
 
@@ -36,13 +38,16 @@ export const Input = (props: {
   onChange: (value: string) => void;
 }) => {
   return (
-    <View column className="input" shrink={false}>
+    <div
+      className="input"
+      style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}
+    >
       <span className="input-label">{props.label}</span>
       <input
         value={props.value || ""}
         onChange={e => props.onChange(e.currentTarget.value)}
       />
-    </View>
+    </div>
   );
 };
 
@@ -51,11 +56,10 @@ export const Checkbox = (props: {
   value: boolean;
   onChange: (value: boolean) => void;
 }) => (
-  <View
+  <div
     className="checkbox"
-    vAlignContent="center"
+    style={{ display: "flex", alignItems: "center", flexShrink: 0 }}
     onClick={() => props.onChange(!props.value)}
-    shrink={false}
   >
     <input
       checked={props.value}
@@ -65,7 +69,7 @@ export const Checkbox = (props: {
       }}
     />
     <span className="checkbox-label">{props.label}</span>
-  </View>
+  </div>
 );
 
 export const Button = (props: {

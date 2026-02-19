@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Run Commands
 
-- `yarn start` — Start dev server (localhost:3000)
-- `yarn build` — Production build to `build/`
+- `yarn start` — Start Vite dev server
+- `yarn build` — Production build to `dist/`
+- `yarn preview` — Preview production build locally
 - `yarn deploy` — Build + deploy to GitHub Pages via gh-pages
-- `yarn analyze` — Analyze bundle with source-map-explorer
 
-Uses `react-app-rewired` (not raw react-scripts) with `config-overrides.js` for Node polyfills (timers, buffer, stream). ESLint is disabled via `DISABLE_ESLINT_PLUGIN=true`.
+Uses Vite with `vite-plugin-pwa` for service worker generation and `vite-plugin-node-polyfills` for Node polyfills (timers, buffer, stream).
 
 ## Architecture
 
-This is a React + TypeScript PWA that displays public amenities (drinking water, toilets, showers, bicycle repair stations, public baths, device charging stations) on a Mapbox map using OpenStreetMap data.
+This is a React 18 + TypeScript 5 PWA that displays public amenities (drinking water, toilets, showers, bicycle repair stations, public baths, device charging stations) on a Mapbox map using OpenStreetMap data.
 
 ### Data Flow
 
@@ -35,7 +35,7 @@ Authenticated users can create, update, and delete OSM nodes via the OSM API. Us
 
 - **`App.tsx`** — Root: renders ServiceWorkerWrapper + Map
 - **`Map.tsx`** — Functional component. Owns all state: map instance (`useRef`), node cache, filters, search radius. Handles Mapbox initialization, GeoJSON source/layer amenity rendering, amenity fetching with debounce
-- **`BottomSheet.tsx`** — Node detail view using react-spring-bottom-sheet. Shows amenity tags, directions link, edit button. Fetches fresh node data from OSM API on open
+- **`BottomSheet.tsx`** — Node detail view using vaul Drawer. Shows amenity tags, directions link, edit button. Fetches fresh node data from OSM API on open
 - **`UpsertNode.tsx`** — Create/update/delete node flow. Two-phase UX: first pick coordinates (crosshair on map), then fill form. Renders different forms based on amenity type
 - **`Popup.tsx`** — Generic modal overlay
 - **`form.tsx`** — Reusable form components (Button, Select, Input, Checkbox)

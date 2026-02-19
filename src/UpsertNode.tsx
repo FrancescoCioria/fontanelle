@@ -1,5 +1,4 @@
 import * as React from "react";
-import View from "react-flexview";
 import { Popup } from "./Popup";
 import {
   getAmenityTitle,
@@ -64,7 +63,7 @@ export const UpsertNodePopup = (props: Props) => {
     const node = state.node;
 
     return (
-      <View column shrink={false}>
+      <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <Button
           label="Change Position"
           onClick={() => {
@@ -206,7 +205,7 @@ export const UpsertNodePopup = (props: Props) => {
             ]}
           />
         )}
-      </View>
+      </div>
     );
   };
 
@@ -216,8 +215,12 @@ export const UpsertNodePopup = (props: Props) => {
       case "update_without_coordinates": {
         return (
           <>
-            <View
+            <div
               style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexGrow: 1,
                 position: "fixed",
                 top: 0,
                 left: 0,
@@ -227,26 +230,25 @@ export const UpsertNodePopup = (props: Props) => {
                 pointerEvents: "none",
                 fontSize: 24
               }}
-              vAlignContent="center"
-              hAlignContent="center"
-              grow
             >
               ✕
-            </View>
+            </div>
 
-            <View
+            <div
               style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 position: "fixed",
                 left: 0,
                 right: 0,
                 bottom: 66,
                 zIndex: 99999
               }}
-              vAlignContent="center"
-              hAlignContent="center"
             >
-              <View
+              <div
                 style={{
+                  display: "flex",
                   paddingTop: 16,
                   paddingBottom: 16,
                   paddingRight: 48,
@@ -287,8 +289,8 @@ export const UpsertNodePopup = (props: Props) => {
                     }
                   }}
                 />
-              </View>
-            </View>
+              </div>
+            </div>
           </>
         );
       }
@@ -301,11 +303,17 @@ export const UpsertNodePopup = (props: Props) => {
               {getAmenityTitle(state.node.tags.amenity)}
             </h2>
 
-            <View style={{ margin: "16px 0 24px" }} className="separator" />
+            <div
+              style={{ display: "flex", margin: "16px 0 24px" }}
+              className="separator"
+            />
 
             {getForm()}
 
-            <View style={{ marginTop: 32 }} className="separator" />
+            <div
+              style={{ display: "flex", marginTop: 32 }}
+              className="separator"
+            />
 
             {error && (
               <div
@@ -352,7 +360,10 @@ export const UpsertNodePopup = (props: Props) => {
 
             {state.type === "update" && (
               <>
-                <View style={{ marginTop: 32 }} className="separator" />
+                <div
+                  style={{ display: "flex", marginTop: 32 }}
+                  className="separator"
+                />
 
                 <Button
                   label={loading ? "Deleting..." : "Delete from OSM"}

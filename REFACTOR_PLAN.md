@@ -132,7 +132,7 @@ Tutto lo stato (filtri, raggio, nodi, mappa, popup) vive in un unico class compo
 ---
 
 ## 7. Aggiornare le dipendenze core
-**Stato: TODO**
+**Stato: Done**
 
 React 17, TypeScript 4.1, react-scripts 5 con react-app-rewired sono datati.
 

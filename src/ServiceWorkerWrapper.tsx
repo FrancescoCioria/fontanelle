@@ -1,6 +1,5 @@
 import React, { FC, useEffect } from "react";
 import * as serviceWorker from "./serviceWorkerRegistration";
-import View from "react-flexview";
 
 // Learn more about service workers: https://bit.ly/CRA-PWA
 
@@ -26,11 +25,12 @@ const ServiceWorkerWrapper: FC = () => {
   };
 
   return showReload ? (
-    <View
+    <div
       className="updateAvailable"
-      vAlignContent="center"
-      hAlignContent="center"
       style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         background: "lightgreen",
         height: 40,
         color: "black",
@@ -65,7 +65,7 @@ const ServiceWorkerWrapper: FC = () => {
       >
         Ignore
       </span>
-    </View>
+    </div>
   ) : null;
 };
 
