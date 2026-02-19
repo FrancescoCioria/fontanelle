@@ -23,7 +23,7 @@ Le chiamate Overpass API e OSM API non hanno gestione errori. Le operazioni CRUD
 ---
 
 ## 2. Eliminare `ReactDOM.render` per i marker
-**Stato: TODO**
+**Stato: Done**
 
 In `Map.tsx:271` ogni marker usa `ReactDOM.render` per montare SVG in un DOM element. Questo è deprecato in React 17 e rimosso in React 18, bloccando l'aggiornamento.
 

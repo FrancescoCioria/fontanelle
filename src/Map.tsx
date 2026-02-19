@@ -1,5 +1,5 @@
 import * as React from "react";
-import * as ReactDOM from "react-dom";
+import { renderToStaticMarkup } from "react-dom/server";
 import debounce from "lodash/debounce";
 import throttle from "lodash/throttle";
 import View from "react-flexview";
@@ -276,17 +276,12 @@ class MapFountains extends React.PureComponent<{}, State> {
       sortBy(nodes, a => amenitiesMapOrder[a.tags.amenity]).forEach(node => {
         if (!this.nodes[node.id]) {
           const element = document.createElement("div");
-
-          ReactDOM.render(
-            <div
-              onClick={() => {
-                this.setState({ openedNode: node });
-              }}
-            >
-              {getAmenityMarker(node.tags, 20)}
-            </div>,
-            element
+          element.innerHTML = renderToStaticMarkup(
+            getAmenityMarker(node.tags, 20)
           );
+          element.addEventListener("click", () => {
+            this.setState({ openedNode: node });
+          });
 
           const marker: mapboxgl.Marker = new mapboxgl.Marker({
             element
