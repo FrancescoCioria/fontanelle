@@ -9,6 +9,7 @@ import View from "react-flexview";
 import { Button } from "./form";
 import capitalize from "lodash/capitalize";
 import { osmGetNode } from "./osm";
+import { useAppStore } from "./store";
 
 import "react-spring-bottom-sheet/dist/style.css";
 
@@ -39,18 +40,16 @@ const Amenity = (props: { label: string; value: string }): JSX.Element => {
   );
 };
 
-type Props = {
-  node: OpenStreetMapNode;
-  onDismiss: () => void;
-  onEditNode: (node: OpenStreetMapNode) => void;
-};
-
 const mapFileImage = (v: any) =>
   typeof v === "string" && v.startsWith("File:")
     ? `https://commons.wikimedia.org/wiki/${v.replaceAll(" ", "_")}`
     : v;
 
-export default (props: Props) => {
+export default () => {
+  const node = useAppStore(s => s.openedNode)!;
+  const setOpenedNode = useAppStore(s => s.setOpenedNode);
+  const setUpsertNode = useAppStore(s => s.setUpsertNode);
+
   const [isOpen, updateOpen] = useState(true);
 
   const [fetchedNode, updateFetchedNode] = useState<
@@ -59,10 +58,10 @@ export default (props: Props) => {
 
   useEffect(() => {
     updateOpen(true);
-    osmGetNode(props.node)
+    osmGetNode(node)
       .then(res => updateFetchedNode(res))
       .catch(() => {});
-  }, [props.node]);
+  }, [node]);
 
   const openUrl = (url: string) => window.open(url, "_blank");
 
@@ -71,7 +70,7 @@ export default (props: Props) => {
       style={{ borderRadius: 40 }}
       open={isOpen}
       onDismiss={() => updateOpen(false)}
-      onSpringEnd={() => !isOpen && props.onDismiss()}
+      onSpringEnd={() => !isOpen && setOpenedNode(null)}
       snapPoints={({ maxHeight }) => {
         return [window.innerHeight * 0.45, maxHeight];
       }}
@@ -85,9 +84,9 @@ export default (props: Props) => {
         style={{ padding: 32, paddingTop: 12, minHeight: "35vh" }}
       >
         <View vAlignContent="center">
-          {getAmenityMarker(props.node.tags, 48)}
+          {getAmenityMarker(node.tags, 48)}
           <span style={{ marginLeft: 16, fontSize: 24 }}>
-            {getAmenityTitle(props.node.tags.amenity)}
+            {getAmenityTitle(node.tags.amenity)}
           </span>
         </View>
 
@@ -104,16 +103,16 @@ export default (props: Props) => {
             label="Directions"
             onClick={() =>
               openUrl(
-                `https://www.google.com/maps/dir//${props.node.lat},${props.node.lon}`
+                `https://www.google.com/maps/dir//${node.lat},${node.lon}`
               )
             }
           />
 
-          {props.node.tags.mapillary && (
+          {node.tags.mapillary && (
             <Button
               style={{ flexGrow: 1, marginLeft: 16 }}
               label="See street view"
-              onClick={() => openUrl(props.node.tags.mapillary!)}
+              onClick={() => openUrl(node.tags.mapillary!)}
             />
           )}
 
@@ -121,8 +120,8 @@ export default (props: Props) => {
             style={{ flexGrow: 1, marginLeft: 16 }}
             label="Edit node"
             onClick={() => {
-              props.onEditNode(props.node);
-              props.onDismiss();
+              setUpsertNode({ type: "update", node });
+              setOpenedNode(null);
             }}
           />
         </View>
@@ -132,11 +131,11 @@ export default (props: Props) => {
         )}
         {fetchedNode && <Amenity label="Created by" value={fetchedNode.user} />}
 
-        {Object.keys(props.node.tags).map(k => (
+        {Object.keys(node.tags).map(k => (
           <Amenity
             key={k}
             label={k}
-            value={mapFileImage(props.node.tags[k as never])}
+            value={mapFileImage(node.tags[k as never])}
           />
         ))}
       </View>

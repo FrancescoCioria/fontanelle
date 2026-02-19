@@ -110,7 +110,7 @@ Ogni amenity è un `mapboxgl.Marker` DOM con virtualizzazione manuale (show/hide
 ---
 
 ## 6. Separare lo state management dal componente Map
-**Stato: TODO**
+**Stato: Done**
 
 Tutto lo stato (filtri, raggio, nodi, mappa, popup) vive in un unico class component. I `nodes` sono fuori dallo state React (proprietà di istanza).
 

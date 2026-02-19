@@ -7,6 +7,7 @@ import {
 } from "./getOpenStreetMapAmenities";
 import { osmAuth, osmCreateNode, osmDeleteNode, osmUpdateNode } from "./osm";
 import { Select, Input, Button } from "./form";
+import { useAppStore } from "./store";
 
 export type UpsertNode =
   | {
@@ -28,17 +29,21 @@ export type UpsertNode =
 
 type Props = {
   map: mapboxgl.Map;
-  onClose: () => void;
   onDone: (
     node: OpenStreetMapNode,
     action: "create" | "update" | "delete"
   ) => void;
-} & UpsertNode;
+};
 
 export const UpsertNodePopup = (props: Props) => {
-  const [state, updateState] = React.useState<UpsertNode>(props);
+  const initialUpsertNode = useAppStore(s => s.upsertNode)!;
+  const setUpsertNode = useAppStore(s => s.setUpsertNode);
+
+  const [state, updateState] = React.useState<UpsertNode>(initialUpsertNode);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const close = () => setUpsertNode(null);
 
   const editNodeTag = (tag: string, value: string) => {
     const tags: OpenStreetMapNode["tags"] = {
@@ -253,7 +258,7 @@ export const UpsertNodePopup = (props: Props) => {
                 <Button
                   label="Cancel"
                   style={{ marginRight: 32 }}
-                  onClick={props.onClose}
+                  onClick={close}
                 />
 
                 <Button
@@ -291,9 +296,9 @@ export const UpsertNodePopup = (props: Props) => {
       case "create":
       case "update": {
         return (
-          <Popup onClose={props.onClose} isOpen={true}>
+          <Popup onClose={close} isOpen={true}>
             <h2 style={{ margin: 0, textAlign: "center" }}>
-              {getAmenityTitle(props.node.tags.amenity)}
+              {getAmenityTitle(state.node.tags.amenity)}
             </h2>
 
             <View style={{ margin: "16px 0 24px" }} className="separator" />
@@ -379,7 +384,7 @@ export const UpsertNodePopup = (props: Props) => {
   } else {
     // user is not logged in OSM
     return (
-      <Popup onClose={props.onClose} isOpen={true}>
+      <Popup onClose={close} isOpen={true}>
         <h2>
           You need to be logged into Open Street Maps to add and edit nodes
         </h2>

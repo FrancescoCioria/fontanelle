@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import debounce from "lodash/debounce";
 import View from "react-flexview";
 import getOpenStreetMapAmenities, {
@@ -14,7 +14,7 @@ import MenuIcon from "./MenuIcon";
 import * as MapboxCircle from "mapbox-gl-circle";
 import LoadingBar, { LoadingBarRef } from "react-top-loading-bar";
 import { Popup } from "./Popup";
-import { UpsertNode, UpsertNodePopup } from "./UpsertNode";
+import { UpsertNodePopup } from "./UpsertNode";
 import { Button, Checkbox } from "./form";
 import BottomSheet from "./BottomSheet";
 import {
@@ -23,8 +23,8 @@ import {
   AMENITIES_SOURCE,
   AMENITIES_LAYER
 } from "./mapIcons";
-
 import Toast from "./Toast";
+import { useAppStore } from "./store";
 
 import "./map.scss";
 
@@ -40,23 +40,28 @@ const amenitiesMapOrder: { [k in Amenity]: number } = {
 };
 
 function MapFountains() {
-  const [openedNode, setOpenedNode] = useState<OpenStreetMapNode | null>(null);
-  const [upsertNode, setUpsertNode] = useState<UpsertNode | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [around, setAround] = useState(0);
-  const [filters, setFilters] = useState<{ [k in Amenity]: boolean }>({
-    drinking_water: true,
-    toilets: true,
-    shower: true,
-    bicycle_repair_station: true,
-    public_bath: true,
-    device_charging_station: true
-  });
-  const [showRadius, setShowRadius] = useState(false);
-  const [continousSearch, setContinousSearch] = useState(false);
-  const [showSearchThisAreaButton, setShowSearchThisAreaButton] =
-    useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const openedNode = useAppStore(s => s.openedNode);
+  const setOpenedNode = useAppStore(s => s.setOpenedNode);
+  const upsertNode = useAppStore(s => s.upsertNode);
+  const setUpsertNode = useAppStore(s => s.setUpsertNode);
+  const isMenuOpen = useAppStore(s => s.isMenuOpen);
+  const setIsMenuOpen = useAppStore(s => s.setIsMenuOpen);
+  const around = useAppStore(s => s.around);
+  const setAround = useAppStore(s => s.setAround);
+  const filters = useAppStore(s => s.filters);
+  const setFilter = useAppStore(s => s.setFilter);
+  const showRadius = useAppStore(s => s.showRadius);
+  const setShowRadius = useAppStore(s => s.setShowRadius);
+  const continousSearch = useAppStore(s => s.continousSearch);
+  const setContinousSearch = useAppStore(s => s.setContinousSearch);
+  const showSearchThisAreaButton = useAppStore(
+    s => s.showSearchThisAreaButton
+  );
+  const setShowSearchThisAreaButton = useAppStore(
+    s => s.setShowSearchThisAreaButton
+  );
+  const errorMessage = useAppStore(s => s.errorMessage);
+  const setErrorMessage = useAppStore(s => s.setErrorMessage);
 
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const nodesRef = useRef<{ [id: string]: OpenStreetMapNode }>({});
@@ -429,9 +434,7 @@ function MapFountains() {
       key={amenity}
       value={filters[amenity]}
       label={getAmenityTitle(amenity)}
-      onChange={show => {
-        setFilters(prev => ({ ...prev, [amenity]: show }));
-      }}
+      onChange={show => setFilter(amenity, show)}
     />
   ));
 
@@ -443,15 +446,7 @@ function MapFountains() {
 
       <View grow id="map" />
 
-      {openedNode && (
-        <BottomSheet
-          node={openedNode}
-          onDismiss={() => setOpenedNode(null)}
-          onEditNode={node =>
-            setUpsertNode({ type: "update", node })
-          }
-        />
-      )}
+      {openedNode && <BottomSheet />}
 
       {showSearchThisAreaButton && openedNode === null && (
         <View
@@ -474,9 +469,6 @@ function MapFountains() {
       {upsertNode && mapRef.current && (
         <UpsertNodePopup
           map={mapRef.current}
-          onClose={() => {
-            setUpsertNode(null);
-          }}
           onDone={(
             node: OpenStreetMapNode,
             action: "create" | "update" | "delete"
@@ -491,7 +483,6 @@ function MapFountains() {
             updateGeoJsonSource();
             setUpsertNode(null);
           }}
-          {...upsertNode}
         />
       )}
 
