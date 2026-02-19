@@ -1,7 +1,6 @@
-import * as React from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import debounce from "lodash/debounce";
 import View from "react-flexview";
-import { Option, none, some, map, isSome } from "fp-ts/lib/Option";
 import getOpenStreetMapAmenities, {
   OpenStreetMapNode,
   updateCachedItems,
@@ -31,20 +30,6 @@ import "./map.scss";
 
 const mapboxgl = window.mapboxgl;
 
-type State = {
-  openedNode: null | OpenStreetMapNode;
-  upsertNode: null | UpsertNode;
-  isMenuOpen: boolean;
-  around: number;
-  filters: {
-    [k in Amenity]: boolean;
-  };
-  showRadius: boolean;
-  continousSearch: boolean;
-  showSearchThisAreaButton: boolean;
-  errorMessage: string | null;
-};
-
 const amenitiesMapOrder: { [k in Amenity]: number } = {
   drinking_water: 1,
   shower: 2,
@@ -54,50 +39,58 @@ const amenitiesMapOrder: { [k in Amenity]: number } = {
   bicycle_repair_station: 6
 };
 
-class MapFountains extends React.PureComponent<{}, State> {
-  state: State = {
-    openedNode: null,
-    upsertNode: null,
-    isMenuOpen: false,
-    around: 0,
-    showRadius: false,
-    filters: {
-      drinking_water: true,
-      toilets: true,
-      shower: true,
-      bicycle_repair_station: true,
-      public_bath: true,
-      device_charging_station: true
-    },
-    continousSearch: false,
-    showSearchThisAreaButton: false,
-    errorMessage: null
-  };
+function MapFountains() {
+  const [openedNode, setOpenedNode] = useState<OpenStreetMapNode | null>(null);
+  const [upsertNode, setUpsertNode] = useState<UpsertNode | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [around, setAround] = useState(0);
+  const [filters, setFilters] = useState<{ [k in Amenity]: boolean }>({
+    drinking_water: true,
+    toilets: true,
+    shower: true,
+    bicycle_repair_station: true,
+    public_bath: true,
+    device_charging_station: true
+  });
+  const [showRadius, setShowRadius] = useState(false);
+  const [continousSearch, setContinousSearch] = useState(false);
+  const [showSearchThisAreaButton, setShowSearchThisAreaButton] =
+    useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  map: Option<mapboxgl.Map> = none;
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const nodesRef = useRef<{ [id: string]: OpenStreetMapNode }>({});
+  const circleRadiusRef = useRef<any>(null);
+  const previousCenterRef = useRef<{ lng: number; lat: number }>({
+    lng: 0,
+    lat: 0
+  });
+  const loadingBarRef = useRef<LoadingBarRef>(null);
 
-  circleRadius: any | null = null;
+  // Mirror state in refs so callbacks/event-handlers always read fresh values
+  const aroundRef = useRef(around);
+  aroundRef.current = around;
+  const showRadiusRef = useRef(showRadius);
+  showRadiusRef.current = showRadius;
+  const continousSearchRef = useRef(continousSearch);
+  continousSearchRef.current = continousSearch;
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
-  nodes: {
-    [id: string]: OpenStreetMapNode;
-  } = {};
+  // --- Helper functions (read from refs, so always up-to-date) ---
 
-  loadingBarRef = React.createRef<LoadingBarRef>();
-
-  previousCenter: { lng: number; lat: number } = { lng: 0, lat: 0 };
-
-  getMap(cb: (map: mapboxgl.Map) => void) {
-    map<mapboxgl.Map, void>(cb)(this.map);
+  function getMap(cb: (map: mapboxgl.Map) => void) {
+    if (mapRef.current) cb(mapRef.current);
   }
 
-  updateGeoJsonSource = () => {
-    this.getMap(map => {
+  function updateGeoJsonSource() {
+    getMap(map => {
       const source = map.getSource(AMENITIES_SOURCE) as
         | mapboxgl.GeoJSONSource
         | undefined;
       if (!source) return;
 
-      const features: GeoJSON.Feature[] = Object.values(this.nodes).map(
+      const features: GeoJSON.Feature[] = Object.values(nodesRef.current).map(
         node => ({
           type: "Feature" as const,
           geometry: {
@@ -118,11 +111,11 @@ class MapFountains extends React.PureComponent<{}, State> {
         features
       });
     });
-  };
+  }
 
-  updateLayerFilter = () => {
-    this.getMap(map => {
-      const enabledAmenities = amenities.filter(a => this.state.filters[a]);
+  function updateLayerFilter() {
+    getMap(map => {
+      const enabledAmenities = amenities.filter(a => filtersRef.current[a]);
 
       if (enabledAmenities.length === amenities.length) {
         map.setFilter(AMENITIES_LAYER, null);
@@ -138,10 +131,24 @@ class MapFountains extends React.PureComponent<{}, State> {
         ]);
       }
     });
-  };
+  }
 
-  updateCachedAmenities = () => {
-    this.getMap(map => {
+  function addAmenitiesMarkers(nodes: OpenStreetMapNode[]) {
+    let changed = false;
+    nodes.forEach(node => {
+      if (!nodesRef.current[node.id]) {
+        nodesRef.current[node.id] = node;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      updateGeoJsonSource();
+    }
+  }
+
+  function updateCachedAmenities() {
+    getMap(map => {
       const center = map.getCenter();
 
       localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
@@ -150,78 +157,140 @@ class MapFountains extends React.PureComponent<{}, State> {
             const distanceInMeters = distance(
               [center.lng, center.lat],
               [node.lon, node.lat],
-              {
-                units: "meters"
-              }
+              { units: "meters" }
             );
 
-            return distanceInMeters < this.state.around;
+            return distanceInMeters < aroundRef.current;
           });
 
-          // add cached nodes contained in the circle radius
-          this.addAmenitiesMarkers(nodesInRadius);
+          addAmenitiesMarkers(nodesInRadius);
         }
       });
     });
-  };
+  }
 
-  updateAmenities = () => {
-    this.getMap(map => {
-      this.updateCachedAmenities();
+  function updateAmenities() {
+    getMap(map => {
+      updateCachedAmenities();
 
-      if (this.loadingBarRef.current) {
+      if (loadingBarRef.current) {
         // @ts-ignore (continuousStart args are optional)
-        this.loadingBarRef.current.continuousStart();
+        loadingBarRef.current.continuousStart();
       }
 
       getOpenStreetMapAmenities({
-        around: this.state.around,
+        around: aroundRef.current,
         lat: map.getCenter().lat,
         lng: map.getCenter().lng
       })
-        .then(this.addAmenitiesMarkers)
+        .then(addAmenitiesMarkers)
         .catch(() => {
-          this.setState({
-            errorMessage: "Failed to load amenities. Please try again."
-          });
+          setErrorMessage("Failed to load amenities. Please try again.");
         })
         .finally(() => {
-          if (this.loadingBarRef.current) {
-            this.loadingBarRef.current.complete();
+          if (loadingBarRef.current) {
+            loadingBarRef.current.complete();
           }
         });
     });
-  };
+  }
 
-  updateAmenitiesDebounce = debounce(() => {
-    this.getMap(map => {
-      if (this.previousCenter.lat === 0 && this.previousCenter.lng === 0) {
-        this.previousCenter = map.getCenter();
-        return;
-      }
+  function showRadiusFn() {
+    getMap(map => {
+      const center = {
+        lat: map.getCenter().lat,
+        lng: map.getCenter().lng
+      };
 
-      const distanceInMeters = distance(
-        [map.getCenter().lat, map.getCenter().lng],
-        [this.previousCenter.lat, this.previousCenter.lng],
-        {
-          units: "meters"
-        }
-      );
-
-      if (distanceInMeters > this.state.around / 2) {
-        if (this.state.continousSearch) {
-          this.previousCenter = map.getCenter();
-          this.updateAmenities();
-        } else {
-          this.setState({ showSearchThisAreaButton: true });
-        }
+      if (circleRadiusRef.current) {
+        circleRadiusRef.current.setCenter(center);
+        circleRadiusRef.current.setRadius(aroundRef.current);
       } else {
-        this.setState({ showSearchThisAreaButton: false });
+        circleRadiusRef.current = new MapboxCircle(
+          center,
+          aroundRef.current,
+          {
+            editable: false,
+            minRadius: 0,
+            fillColor: "transparent"
+          }
+        ).addTo(map);
       }
     });
-  }, 1000);
+  }
 
-  initializeMap() {
+  function hideRadius() {
+    if (circleRadiusRef.current) {
+      circleRadiusRef.current.remove();
+      circleRadiusRef.current = null;
+    }
+  }
+
+  // Ref to always have the latest updateAmenities for the debounce
+  const updateAmenitiesFnRef = useRef(updateAmenities);
+  updateAmenitiesFnRef.current = updateAmenities;
+
+  // Stable debounced function (created once, reads from refs)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const updateAmenitiesDebounce = useMemo(
+    () =>
+      debounce(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        if (
+          previousCenterRef.current.lat === 0 &&
+          previousCenterRef.current.lng === 0
+        ) {
+          previousCenterRef.current = map.getCenter();
+          return;
+        }
+
+        const distanceInMeters = distance(
+          [map.getCenter().lat, map.getCenter().lng],
+          [previousCenterRef.current.lat, previousCenterRef.current.lng],
+          { units: "meters" }
+        );
+
+        if (distanceInMeters > aroundRef.current / 2) {
+          if (continousSearchRef.current) {
+            previousCenterRef.current = map.getCenter();
+            updateAmenitiesFnRef.current();
+          } else {
+            setShowSearchThisAreaButton(true);
+          }
+        } else {
+          setShowSearchThisAreaButton(false);
+        }
+      }, 1000),
+    []
+  );
+
+  // Ref to always have the latest showRadiusFn for the map move handler
+  const showRadiusFnRef = useRef(showRadiusFn);
+  showRadiusFnRef.current = showRadiusFn;
+
+  // --- Effects ---
+
+  // Initialization (replaces componentDidMount)
+  useEffect(() => {
+    // initialize persisted settings
+    localforage
+      .getItem<number>("around")
+      .then(v => setAround(v || 1000));
+
+    localforage.getItem<boolean>("showRadius").then(v => {
+      setShowRadius(v === null ? true : v);
+      if (v) {
+        showRadiusFnRef.current();
+      }
+    });
+
+    localforage
+      .getItem<boolean>("continousSearch")
+      .then(v => setContinousSearch(v || false));
+
+    // initialize map
     mapboxgl.accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
 
@@ -269,7 +338,7 @@ class MapFountains extends React.PureComponent<{}, State> {
       map.addControl(new mapboxgl.ScaleControl());
 
       map.on("load", async () => {
-        this.map = some(map);
+        mapRef.current = map;
 
         await registerMapIcons(map);
 
@@ -294,9 +363,9 @@ class MapFountains extends React.PureComponent<{}, State> {
         map.on("click", AMENITIES_LAYER, e => {
           const feature = e.features?.[0];
           if (feature?.properties?.id) {
-            const node = this.nodes[feature.properties.id];
+            const node = nodesRef.current[feature.properties.id];
             if (node) {
-              this.setState({ openedNode: node });
+              setOpenedNode(node);
             }
           }
         });
@@ -309,7 +378,7 @@ class MapFountains extends React.PureComponent<{}, State> {
           map.getCanvas().style.cursor = "";
         });
 
-        this.updateAmenities();
+        updateAmenitiesFnRef.current();
 
         (
           document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
@@ -317,11 +386,11 @@ class MapFountains extends React.PureComponent<{}, State> {
       });
 
       map.on("move", () => {
-        this.updateAmenitiesDebounce();
+        updateAmenitiesDebounce();
 
         requestAnimationFrame(() => {
-          if (this.state.showRadius) {
-            this.showRadius();
+          if (showRadiusRef.current) {
+            showRadiusFnRef.current();
           }
         });
       });
@@ -337,275 +406,198 @@ class MapFountains extends React.PureComponent<{}, State> {
     } else {
       positionCallback(defaultCoordinates);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  addAmenitiesMarkers = (nodes: OpenStreetMapNode[]) => {
-    let changed = false;
-    nodes.forEach(node => {
-      if (!this.nodes[node.id]) {
-        this.nodes[node.id] = node;
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      this.updateGeoJsonSource();
-    }
-  };
-
-  showRadius() {
-    this.getMap(map => {
-      const center = {
-        lat: map.getCenter().lat,
-        lng: map.getCenter().lng
-      };
-
-      if (this.circleRadius) {
-        this.circleRadius.setCenter(center);
-
-        this.circleRadius.setRadius(this.state.around);
-      } else {
-        this.circleRadius = new MapboxCircle(center, this.state.around, {
-          editable: false,
-          minRadius: 0,
-          fillColor: "transparent"
-        }).addTo(map);
-      }
-    });
-  }
-
-  hideRadius() {
-    this.circleRadius.remove();
-    this.circleRadius = null;
-  }
-
-  componentDidMount() {
-    // initialize "around" radius
-    localforage
-      .getItem<number>("around")
-      .then(around => this.setState({ around: around || 1000 }));
-
-    // initialize "showRadius" option
-    localforage.getItem<boolean>("showRadius").then(showRadius => {
-      this.setState({ showRadius: showRadius === null ? true : showRadius });
-
-      if (showRadius) {
-        this.showRadius();
-      }
-    });
-
-    // initialize "continousSearch" option
-    localforage
-      .getItem<boolean>("continousSearch")
-      .then(continousSearch =>
-        this.setState({ continousSearch: continousSearch || false })
-      );
-
-    // initialize map
-    this.initializeMap();
-  }
-
-  componentDidUpdate() {
+  // Resize map on re-render (replaces componentDidUpdate)
+  useEffect(() => {
     requestAnimationFrame(() => {
-      this.getMap(map => map.resize());
+      getMap(map => map.resize());
     });
-  }
+  });
 
-  updateFilter(amenity: Amenity, value: boolean) {
-    this.setState({
-      filters: {
-        ...this.state.filters,
-        [amenity]: value
-      }
-    });
-  }
+  // Update layer filter when filters change
+  useEffect(() => {
+    updateLayerFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
-  render() {
-    const filters = amenities.map(
-      (amenity): JSX.Element => (
-        <Checkbox
-          key={amenity}
-          value={this.state.filters[amenity]}
-          label={getAmenityTitle(amenity)}
-          onChange={show => {
-            this.updateFilter(amenity, show);
+  // --- Render ---
 
-            setTimeout(() => this.updateLayerFilter());
-          }}
+  const filterCheckboxes = amenities.map(amenity => (
+    <Checkbox
+      key={amenity}
+      value={filters[amenity]}
+      label={getAmenityTitle(amenity)}
+      onChange={show => {
+        setFilters(prev => ({ ...prev, [amenity]: show }));
+      }}
+    />
+  ));
+
+  return (
+    <View style={{ height: "100%", width: "100%" }} column>
+      <View>
+        <LoadingBar ref={loadingBarRef} color="lightgreen" height={8} />
+      </View>
+
+      <View grow id="map" />
+
+      {openedNode && (
+        <BottomSheet
+          node={openedNode}
+          onDismiss={() => setOpenedNode(null)}
+          onEditNode={node =>
+            setUpsertNode({ type: "update", node })
+          }
         />
-      )
-    );
+      )}
 
-    return (
-      <View style={{ height: "100%", width: "100%" }} column>
-        <View>
-          <LoadingBar ref={this.loadingBarRef} color="lightgreen" height={8} />
+      {showSearchThisAreaButton && openedNode === null && (
+        <View
+          className="search-this-area-button"
+          vAlignContent="center"
+          hAlignContent="center"
+          onClick={() => {
+            getMap(map => {
+              previousCenterRef.current = map.getCenter();
+              updateAmenities();
+
+              setShowSearchThisAreaButton(false);
+            });
+          }}
+        >
+          Search this area
         </View>
+      )}
 
-        <View grow id="map" />
-
-        {this.state.openedNode && (
-          <BottomSheet
-            node={this.state.openedNode}
-            onDismiss={() => this.setState({ openedNode: null })}
-            onEditNode={node =>
-              this.setState({
-                upsertNode: { type: "update", node }
-              })
+      {upsertNode && mapRef.current && (
+        <UpsertNodePopup
+          map={mapRef.current}
+          onClose={() => {
+            setUpsertNode(null);
+          }}
+          onDone={(
+            node: OpenStreetMapNode,
+            action: "create" | "update" | "delete"
+          ) => {
+            if (action === "delete") {
+              delete nodesRef.current[node.id];
+            } else {
+              nodesRef.current[node.id] = node;
+              updateCachedItems([node]);
             }
-          />
-        )}
 
-        {this.state.showSearchThisAreaButton &&
-          this.state.openedNode === null && (
-            <View
-              className="search-this-area-button"
-              vAlignContent="center"
-              hAlignContent="center"
-              onClick={() => {
-                this.getMap(map => {
-                  this.previousCenter = map.getCenter();
-                  this.updateAmenities();
+            updateGeoJsonSource();
+            setUpsertNode(null);
+          }}
+          {...upsertNode}
+        />
+      )}
 
-                  this.setState({ showSearchThisAreaButton: false });
-                });
-              }}
-            >
-              Search this area
-            </View>
-          )}
+      <View
+        className="menu-button"
+        hAlignContent="center"
+        vAlignContent="center"
+        style={openedNode ? { zIndex: 2 } : undefined}
+        onClick={() => setIsMenuOpen(true)}
+      >
+        <MenuIcon />
 
-        {this.state.upsertNode && isSome(this.map) && (
-          <UpsertNodePopup
-            map={this.map.value}
-            onClose={() => {
-              this.setState({ upsertNode: null });
-            }}
-            onDone={(
-              node: OpenStreetMapNode,
-              action: "create" | "update" | "delete"
-            ) => {
-              if (action === "delete") {
-                delete this.nodes[node.id];
-              } else {
-                this.nodes[node.id] = node;
-                updateCachedItems([node]);
+        {/* popup */}
+        <Popup
+          onClose={() => {
+            setIsMenuOpen(false);
+          }}
+          isOpen={isMenuOpen}
+        >
+          <h4>Search options</h4>
+
+          <span style={{ marginTop: 16, marginBottom: 8 }}>
+            Around radius: <b>{around} meters</b>
+          </span>
+          <input
+            value={around}
+            type="range"
+            min="500"
+            max="15000"
+            step="500"
+            onChange={e => {
+              const newAround = parseInt(e.currentTarget.value) || 1000;
+
+              setAround(newAround);
+              aroundRef.current = newAround;
+
+              if (showRadiusRef.current) {
+                showRadiusFn();
               }
 
-              this.updateGeoJsonSource();
-              this.setState({ upsertNode: null });
+              localforage.setItem("around", newAround);
             }}
-            {...this.state.upsertNode}
           />
-        )}
 
-        <View
-          className="menu-button"
-          hAlignContent="center"
-          vAlignContent="center"
-          style={this.state.openedNode ? { zIndex: 2 } : undefined}
-          onClick={() => this.setState({ isMenuOpen: true })}
-        >
-          <MenuIcon />
+          <View height={24} />
 
-          {/* popup */}
-          <Popup
-            onClose={() => {
-              this.setState({ isMenuOpen: false });
+          <Checkbox
+            value={showRadius}
+            label="Show radius in map"
+            onChange={sr => {
+              setShowRadius(sr);
+              localforage.setItem("showRadius", sr);
+
+              if (sr) {
+                showRadiusFn();
+              } else {
+                hideRadius();
+              }
             }}
-            isOpen={this.state.isMenuOpen}
-          >
-            <h4>Search options</h4>
+          />
 
-            <span style={{ marginTop: 16, marginBottom: 8 }}>
-              Around radius: <b>{this.state.around} meters</b>
-            </span>
-            <input
-              value={this.state.around}
-              type="range"
-              min="500"
-              max="15000"
-              step="500"
-              onChange={e => {
-                const around = parseInt(e.currentTarget.value) || 1000;
+          <Checkbox
+            value={continousSearch}
+            label="Enable continous search"
+            onChange={cs => {
+              setContinousSearch(cs);
+              setShowSearchThisAreaButton(false);
+              localforage.setItem("continousSearch", cs);
+            }}
+          />
 
-                this.setState({ around }, () => {
-                  if (this.state.showRadius) {
-                    this.showRadius();
+          <View className="separator" />
+
+          <h4 style={{ marginBottom: 8 }}>Filters</h4>
+          {filterCheckboxes}
+
+          <View className="separator" />
+
+          <h4>Add new amenity (OSM account required)</h4>
+          {amenities.map((amenity, i) => (
+            <Button
+              key={amenity}
+              label={`Add ${getAmenityTitle(amenity)}`}
+              style={{ marginTop: i === 0 ? 16 : 24 }}
+              onClick={() => {
+                setIsMenuOpen(false);
+                setUpsertNode({
+                  type: "create_without_coordinates",
+                  node: {
+                    tags: { amenity }
                   }
                 });
-
-                localforage.setItem("around", around);
               }}
             />
-
-            <View height={24} />
-
-            <Checkbox
-              value={this.state.showRadius}
-              label="Show radius in map"
-              onChange={showRadius => {
-                this.setState({ showRadius });
-                localforage.setItem("showRadius", showRadius);
-
-                if (showRadius) {
-                  this.showRadius();
-                } else {
-                  this.hideRadius();
-                }
-              }}
-            />
-
-            <Checkbox
-              value={this.state.continousSearch}
-              label="Enable continous search"
-              onChange={continousSearch => {
-                this.setState({
-                  continousSearch,
-                  showSearchThisAreaButton: false
-                });
-                localforage.setItem("continousSearch", continousSearch);
-              }}
-            />
-
-            <View className="separator" />
-
-            <h4 style={{ marginBottom: 8 }}>Filters</h4>
-            {filters}
-
-            <View className="separator" />
-
-            <h4>Add new amenity (OSM account required)</h4>
-            {amenities.map((amenity, i) => (
-              <Button
-                key={amenity}
-                label={`Add ${getAmenityTitle(amenity)}`}
-                style={{ marginTop: i === 0 ? 16 : 24 }}
-                onClick={() => {
-                  this.setState({
-                    isMenuOpen: false,
-                    upsertNode: {
-                      type: "create_without_coordinates",
-                      node: {
-                        tags: { amenity }
-                      }
-                    }
-                  });
-                }}
-              />
-            ))}
-          </Popup>
-        </View>
-
-        {this.state.errorMessage && (
-          <Toast
-            message={this.state.errorMessage}
-            onDismiss={() => this.setState({ errorMessage: null })}
-          />
-        )}
+          ))}
+        </Popup>
       </View>
-    );
-  }
+
+      {errorMessage && (
+        <Toast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+        />
+      )}
+    </View>
+  );
 }
 
 export default MapFountains;

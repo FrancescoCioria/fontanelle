@@ -66,7 +66,7 @@ Ogni amenity è un `mapboxgl.Marker` DOM con virtualizzazione manuale (show/hide
 ---
 
 ## 4. Migrazione da class component a functional component (`Map.tsx`)
-**Stato: TODO**
+**Stato: Done**
 
 `Map.tsx` è un class component di ~600 righe che gestisce tutto lo stato dell'app.
 
