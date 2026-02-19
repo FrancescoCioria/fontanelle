@@ -23,6 +23,8 @@ import { Button, Checkbox } from "./form";
 import BottomSheet from "./BottomSheet";
 import sortBy from "lodash/sortBy";
 
+import Toast from "./Toast";
+
 import "./map.scss";
 
 const mapboxgl = window.mapboxgl;
@@ -38,6 +40,7 @@ type State = {
   showRadius: boolean;
   continousSearch: boolean;
   showSearchThisAreaButton: boolean;
+  errorMessage: string | null;
 };
 
 type StateNode = {
@@ -62,7 +65,8 @@ class MapFountains extends React.PureComponent<{}, State> {
       device_charging_station: true
     },
     continousSearch: false,
-    showSearchThisAreaButton: false
+    showSearchThisAreaButton: false,
+    errorMessage: null
   };
 
   map: Option<mapboxgl.Map> = none;
@@ -121,6 +125,11 @@ class MapFountains extends React.PureComponent<{}, State> {
         lng: map.getCenter().lng
       })
         .then(this.addAmenitiesMarkers)
+        .catch(() => {
+          this.setState({
+            errorMessage: "Failed to load amenities. Please try again."
+          });
+        })
         .finally(() => {
           if (this.loadingBarRef.current) {
             this.loadingBarRef.current.complete();
@@ -589,6 +598,13 @@ class MapFountains extends React.PureComponent<{}, State> {
             ))}
           </Popup>
         </View>
+
+        {this.state.errorMessage && (
+          <Toast
+            message={this.state.errorMessage}
+            onDismiss={() => this.setState({ errorMessage: null })}
+          />
+        )}
       </View>
     );
   }

@@ -145,3 +145,20 @@ svg {
   // buffered-rendering: static;
   contain: paint;
 }
+
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999999;
+  background: #d32f2f;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  max-width: 80vw;
+  text-align: center;
+}

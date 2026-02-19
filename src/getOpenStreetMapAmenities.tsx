@@ -92,6 +92,30 @@ export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
   localforage.setItem("amenities", nodes);
 };
 
+const fetchWithRetry = async (
+  url: string,
+  retries: number = 3
+): Promise<Response> => {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(url);
+
+    if (res.ok) {
+      return res;
+    }
+
+    if (res.status === 429 || res.status >= 500) {
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+    }
+
+    throw new Error(`Overpass API error: ${res.status} ${res.statusText}`);
+  }
+
+  throw new Error("Overpass API: max retries reached");
+};
+
 export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   const res = await Promise.all(
     [
@@ -107,10 +131,10 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
       `;
 
       const OverpassApiService = "https://overpass-api.de/api/interpreter";
-      // const OverpassApiService =
-      //   "https://overpass.kumi.systems/api/interpreter";
 
-      const res = await fetch(`${OverpassApiService}?data=${formData}&output`);
+      const res = await fetchWithRetry(
+        `${OverpassApiService}?data=${formData}&output`
+      );
 
       const json: { elements: OpenStreetMapNode[] } = await res.json();
 

@@ -37,6 +37,8 @@ type Props = {
 
 export const UpsertNodePopup = (props: Props) => {
   const [state, updateState] = React.useState<UpsertNode>(props);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   const editNodeTag = (tag: string, value: string) => {
     const tags: OpenStreetMapNode["tags"] = {
@@ -300,24 +302,46 @@ export const UpsertNodePopup = (props: Props) => {
 
             <View style={{ marginTop: 32 }} className="separator" />
 
+            {error && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: "8px 12px",
+                  background: "#ffebee",
+                  color: "#d32f2f",
+                  borderRadius: 4,
+                  fontSize: 14
+                }}
+              >
+                {error}
+              </div>
+            )}
+
             <Button
-              label="Save on OSM"
+              label={loading ? "Saving..." : "Save on OSM"}
               style={{
                 marginTop: 24,
-                background: "#24A0ED"
+                background: "#24A0ED",
+                opacity: loading ? 0.6 : 1
               }}
               onClick={() => {
-                if (state.type === "create") {
-                  // create
-                  osmCreateNode({ ...state.node }).then(n =>
-                    props.onDone(n, "create")
-                  );
-                } else {
-                  // update
-                  osmUpdateNode({ ...state.node }).then(n =>
-                    props.onDone(n, "update")
-                  );
-                }
+                if (loading) return;
+                setLoading(true);
+                setError(null);
+
+                const promise =
+                  state.type === "create"
+                    ? osmCreateNode({ ...state.node }).then(n =>
+                        props.onDone(n, "create")
+                      )
+                    : osmUpdateNode({ ...state.node }).then(n =>
+                        props.onDone(n, "update")
+                      );
+
+                promise.catch(() => {
+                  setError("Failed to save. Please try again.");
+                  setLoading(false);
+                });
               }}
             />
 
@@ -326,16 +350,24 @@ export const UpsertNodePopup = (props: Props) => {
                 <View style={{ marginTop: 32 }} className="separator" />
 
                 <Button
-                  label="Delete from OSM"
+                  label={loading ? "Deleting..." : "Delete from OSM"}
                   style={{
                     marginTop: 24,
                     background: "#f44336",
-                    color: "white"
+                    color: "white",
+                    opacity: loading ? 0.6 : 1
                   }}
                   onClick={() => {
-                    osmDeleteNode({ ...state.node }).then(n =>
-                      props.onDone(n, "delete")
-                    );
+                    if (loading) return;
+                    setLoading(true);
+                    setError(null);
+
+                    osmDeleteNode({ ...state.node })
+                      .then(n => props.onDone(n, "delete"))
+                      .catch(() => {
+                        setError("Failed to delete. Please try again.");
+                        setLoading(false);
+                      });
                   }}
                 />
               </>
