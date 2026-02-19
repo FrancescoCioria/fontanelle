@@ -43,7 +43,7 @@ In `Map.tsx:271` ogni marker usa `ReactDOM.render` per montare SVG in un DOM ele
 ---
 
 ## 3. Usare Mapbox GL Source/Layer invece di marker DOM individuali
-**Stato: TODO**
+**Stato: Done**
 
 Ogni amenity è un `mapboxgl.Marker` DOM con virtualizzazione manuale (show/hide basata su bounds). Con centinaia di nodi il DOM si appesantisce.
 

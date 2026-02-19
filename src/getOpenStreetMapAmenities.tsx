@@ -11,7 +11,7 @@ import OpeningHours from "opening_hours";
 
 import "localforage-getitems";
 
-type AmenityTags = { mapillary?: string } & (
+export type AmenityTags = { mapillary?: string } & (
   | {
       amenity: "drinking_water";
       indoor?: "yes" | "no";
@@ -147,10 +147,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   return flatten(res);
 };
 
-export const getAmenityMarker = (
-  amenityTags: AmenityTags,
-  size: number
-): JSX.Element => {
+export const getAmenityColor = (amenityTags: AmenityTags): string => {
   const disabledColor = "#d0d0d0";
 
   const closed = (): string | null => {
@@ -183,21 +180,26 @@ export const getAmenityMarker = (
       : null;
   };
 
-  const color = (): string => {
-    return closed() || notPublic() || feeRequired() || "white";
-  };
+  return closed() || notPublic() || feeRequired() || "white";
+};
+
+export const getAmenityMarker = (
+  amenityTags: AmenityTags,
+  size: number
+): JSX.Element => {
+  const color = getAmenityColor(amenityTags);
 
   switch (amenityTags.amenity) {
     case "drinking_water":
       return <DrinkingWaterMarker size={size} />;
     case "toilets":
-      return <PublicToiletsMarker size={size} color={color()} />;
+      return <PublicToiletsMarker size={size} color={color} />;
     case "shower":
-      return <PublicShowerMarker size={size} color={color()} />;
+      return <PublicShowerMarker size={size} color={color} />;
     case "bicycle_repair_station":
       return <BicycleRepairStationMarker size={size} />;
     case "public_bath":
-      return <PublicBathMarker size={size} color={color()} />;
+      return <PublicBathMarker size={size} color={color} />;
     case "device_charging_station":
       return <DeviceChargingStationMarker size={size} />;
   }

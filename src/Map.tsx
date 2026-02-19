@@ -1,13 +1,10 @@
 import * as React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import debounce from "lodash/debounce";
-import throttle from "lodash/throttle";
 import View from "react-flexview";
 import { Option, none, some, map, isSome } from "fp-ts/lib/Option";
 import getOpenStreetMapAmenities, {
   OpenStreetMapNode,
   updateCachedItems,
-  getAmenityMarker,
   Amenity,
   getAmenityTitle,
   amenities
@@ -21,7 +18,12 @@ import { Popup } from "./Popup";
 import { UpsertNode, UpsertNodePopup } from "./UpsertNode";
 import { Button, Checkbox } from "./form";
 import BottomSheet from "./BottomSheet";
-import sortBy from "lodash/sortBy";
+import {
+  registerMapIcons,
+  getIconName,
+  AMENITIES_SOURCE,
+  AMENITIES_LAYER
+} from "./mapIcons";
 
 import Toast from "./Toast";
 
@@ -43,10 +45,13 @@ type State = {
   errorMessage: string | null;
 };
 
-type StateNode = {
-  node: OpenStreetMapNode;
-  marker: mapboxgl.Marker;
-  visible: boolean;
+const amenitiesMapOrder: { [k in Amenity]: number } = {
+  drinking_water: 1,
+  shower: 2,
+  toilets: 3,
+  public_bath: 4,
+  device_charging_station: 5,
+  bicycle_repair_station: 6
 };
 
 class MapFountains extends React.PureComponent<{}, State> {
@@ -74,7 +79,7 @@ class MapFountains extends React.PureComponent<{}, State> {
   circleRadius: any | null = null;
 
   nodes: {
-    [id: string]: StateNode;
+    [id: string]: OpenStreetMapNode;
   } = {};
 
   loadingBarRef = React.createRef<LoadingBarRef>();
@@ -84,6 +89,56 @@ class MapFountains extends React.PureComponent<{}, State> {
   getMap(cb: (map: mapboxgl.Map) => void) {
     map<mapboxgl.Map, void>(cb)(this.map);
   }
+
+  updateGeoJsonSource = () => {
+    this.getMap(map => {
+      const source = map.getSource(AMENITIES_SOURCE) as
+        | mapboxgl.GeoJSONSource
+        | undefined;
+      if (!source) return;
+
+      const features: GeoJSON.Feature[] = Object.values(this.nodes).map(
+        node => ({
+          type: "Feature" as const,
+          geometry: {
+            type: "Point" as const,
+            coordinates: [node.lon, node.lat]
+          },
+          properties: {
+            id: node.id,
+            amenity: node.tags.amenity,
+            icon: getIconName(node.tags),
+            sortOrder: amenitiesMapOrder[node.tags.amenity]
+          }
+        })
+      );
+
+      source.setData({
+        type: "FeatureCollection",
+        features
+      });
+    });
+  };
+
+  updateLayerFilter = () => {
+    this.getMap(map => {
+      const enabledAmenities = amenities.filter(a => this.state.filters[a]);
+
+      if (enabledAmenities.length === amenities.length) {
+        map.setFilter(AMENITIES_LAYER, null);
+      } else if (enabledAmenities.length === 0) {
+        map.setFilter(AMENITIES_LAYER, false);
+      } else {
+        map.setFilter(AMENITIES_LAYER, [
+          "match",
+          ["get", "amenity"],
+          enabledAmenities,
+          true,
+          false
+        ]);
+      }
+    });
+  };
 
   updateCachedAmenities = () => {
     this.getMap(map => {
@@ -166,18 +221,6 @@ class MapFountains extends React.PureComponent<{}, State> {
     });
   }, 1000);
 
-  updateMarkersThrottle = throttle(() => {
-    // virtualize markers
-
-    Object.values(this.nodes).forEach(v => {
-      if (v.visible) {
-        this.hideNode(v);
-      } else {
-        this.showNode(v);
-      }
-    });
-  }, 96);
-
   initializeMap() {
     mapboxgl.accessToken =
       "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
@@ -225,8 +268,46 @@ class MapFountains extends React.PureComponent<{}, State> {
 
       map.addControl(new mapboxgl.ScaleControl());
 
-      map.on("load", () => {
+      map.on("load", async () => {
         this.map = some(map);
+
+        await registerMapIcons(map);
+
+        map.addSource(AMENITIES_SOURCE, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] }
+        });
+
+        map.addLayer({
+          id: AMENITIES_LAYER,
+          type: "symbol",
+          source: AMENITIES_SOURCE,
+          layout: {
+            "icon-image": ["get", "icon"],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "symbol-sort-key": ["get", "sortOrder"]
+          }
+        });
+
+        // Click handler
+        map.on("click", AMENITIES_LAYER, e => {
+          const feature = e.features?.[0];
+          if (feature?.properties?.id) {
+            const node = this.nodes[feature.properties.id];
+            if (node) {
+              this.setState({ openedNode: node });
+            }
+          }
+        });
+
+        // Pointer cursor on hover
+        map.on("mouseenter", AMENITIES_LAYER, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", AMENITIES_LAYER, () => {
+          map.getCanvas().style.cursor = "";
+        });
 
         this.updateAmenities();
 
@@ -242,8 +323,6 @@ class MapFountains extends React.PureComponent<{}, State> {
           if (this.state.showRadius) {
             this.showRadius();
           }
-
-          this.updateMarkersThrottle();
         });
       });
     };
@@ -261,47 +340,17 @@ class MapFountains extends React.PureComponent<{}, State> {
   }
 
   addAmenitiesMarkers = (nodes: OpenStreetMapNode[]) => {
-    this.getMap(map => {
-      const bounds = map.getBounds();
-
-      const amenitiesMapOrder: { [k in Amenity]: number } = {
-        drinking_water: 1,
-        shower: 2,
-        toilets: 3,
-        public_bath: 4,
-        device_charging_station: 5,
-        bicycle_repair_station: 6
-      };
-
-      sortBy(nodes, a => amenitiesMapOrder[a.tags.amenity]).forEach(node => {
-        if (!this.nodes[node.id]) {
-          const element = document.createElement("div");
-          element.innerHTML = renderToStaticMarkup(
-            getAmenityMarker(node.tags, 20)
-          );
-          element.addEventListener("click", () => {
-            this.setState({ openedNode: node });
-          });
-
-          const marker: mapboxgl.Marker = new mapboxgl.Marker({
-            element
-          }).setLngLat([node.lon, node.lat]);
-
-          const visible =
-            this.state.filters[node.tags.amenity] && bounds.contains(node);
-
-          if (visible) {
-            marker.addTo(map);
-          }
-
-          this.nodes[node.id] = {
-            node,
-            marker,
-            visible
-          };
-        }
-      });
+    let changed = false;
+    nodes.forEach(node => {
+      if (!this.nodes[node.id]) {
+        this.nodes[node.id] = node;
+        changed = true;
+      }
     });
+
+    if (changed) {
+      this.updateGeoJsonSource();
+    }
   };
 
   showRadius() {
@@ -362,12 +411,6 @@ class MapFountains extends React.PureComponent<{}, State> {
     });
   }
 
-  amenityNodes(amenity: Amenity) {
-    return Object.values(this.nodes).filter(
-      v => v.node.tags.amenity === amenity
-    );
-  }
-
   updateFilter(amenity: Amenity, value: boolean) {
     this.setState({
       filters: {
@@ -376,32 +419,6 @@ class MapFountains extends React.PureComponent<{}, State> {
       }
     });
   }
-
-  showNode = (node: StateNode) => {
-    this.getMap(map => {
-      if (
-        !this.nodes[node.node.id].visible &&
-        this.state.filters[node.node.tags.amenity] &&
-        map.getBounds().contains(node.node)
-      ) {
-        node.marker.addTo(map);
-        this.nodes[node.node.id] = { ...node, visible: true };
-      }
-    });
-  };
-
-  hideNode = (node: StateNode) => {
-    this.getMap(map => {
-      if (
-        this.nodes[node.node.id].visible &&
-        (!this.state.filters[node.node.tags.amenity] ||
-          !map.getBounds().contains(node.node))
-      ) {
-        node.marker.remove();
-        this.nodes[node.node.id] = { ...node, visible: false };
-      }
-    });
-  };
 
   render() {
     const filters = amenities.map(
@@ -413,13 +430,7 @@ class MapFountains extends React.PureComponent<{}, State> {
           onChange={show => {
             this.updateFilter(amenity, show);
 
-            setTimeout(() => {
-              if (show) {
-                this.amenityNodes(amenity).forEach(this.showNode);
-              } else {
-                this.amenityNodes(amenity).forEach(this.hideNode);
-              }
-            });
+            setTimeout(() => this.updateLayerFilter());
           }}
         />
       )
@@ -474,22 +485,14 @@ class MapFountains extends React.PureComponent<{}, State> {
               node: OpenStreetMapNode,
               action: "create" | "update" | "delete"
             ) => {
-              if (this.nodes[node.id]) {
-                // remove marker
-                this.nodes[node.id].marker.remove();
-
-                // delete node from cache
+              if (action === "delete") {
                 delete this.nodes[node.id];
-              }
-
-              if (action === "create" || action === "update") {
-                // show updated/created node
-                this.addAmenitiesMarkers([node]);
-
-                // fire&forget
+              } else {
+                this.nodes[node.id] = node;
                 updateCachedItems([node]);
               }
 
+              this.updateGeoJsonSource();
               this.setState({ upsertNode: null });
             }}
             {...this.state.upsertNode}
