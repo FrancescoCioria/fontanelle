@@ -10,8 +10,6 @@ import capitalize from "lodash/capitalize";
 import { osmGetNode } from "./osm";
 import { useAppStore } from "./store";
 
-const snapPoints = [0.45, 0.85];
-
 const Amenity = (props: { label: string; value: string }): JSX.Element => {
   const clickable = props.value.startsWith("https://");
   return (
@@ -49,8 +47,7 @@ export default () => {
   const setOpenedNode = useAppStore(s => s.setOpenedNode);
   const setUpsertNode = useAppStore(s => s.setUpsertNode);
 
-  const [isOpen, updateOpen] = useState(true);
-  const [snap, setSnap] = useState<number | string | null>(snapPoints[0]);
+  const [isOpen, updateOpen] = useState(false);
 
   const [fetchedNode, updateFetchedNode] = useState<
     (OpenStreetMapNode & { timestamp: string; user: string }) | null
@@ -70,20 +67,15 @@ export default () => {
       open={isOpen}
       onOpenChange={open => {
         updateOpen(open);
-      }}
-      onAnimationEnd={open => {
         if (!open) setOpenedNode(null);
       }}
-      snapPoints={snapPoints}
-      activeSnapPoint={snap}
-      setActiveSnapPoint={setSnap}
-      dismissible={true}
     >
       <Drawer.Portal>
         <Drawer.Overlay
           style={{
             position: "fixed",
             inset: 0,
+            zIndex: 10000,
             backgroundColor: "rgba(0, 0, 0, 0.4)"
           }}
         />
@@ -94,10 +86,14 @@ export default () => {
             bottom: 0,
             left: 0,
             right: 0,
+            zIndex: 10001,
+            maxHeight: "85vh",
             backgroundColor: "white",
             borderTopLeftRadius: 40,
             borderTopRightRadius: 40,
-            outline: "none"
+            outline: "none",
+            display: "flex",
+            flexDirection: "column"
           }}
         >
           <Drawer.Title style={{ position: "absolute", left: -9999 }}>
@@ -105,13 +101,10 @@ export default () => {
           </Drawer.Title>
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              flexShrink: 0,
               padding: 32,
               paddingTop: 12,
-              minHeight: "35vh",
-              overflowY: snap === snapPoints[1] ? "auto" : "hidden"
+              overflowY: "auto",
+              flex: 1
             }}
           >
             <div style={{ display: "flex", alignItems: "center" }}>

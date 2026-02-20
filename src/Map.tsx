@@ -10,7 +10,7 @@ import getOpenStreetMapAmenities, {
 import distance from "@turf/distance";
 import localforage from "localforage";
 import MenuIcon from "./MenuIcon";
-import * as MapboxCircle from "mapbox-gl-circle";
+import MapboxCircle from "mapbox-gl-circle";
 import LoadingBar, { LoadingBarRef } from "react-top-loading-bar";
 import { Popup } from "./Popup";
 import { UpsertNodePopup } from "./UpsertNode";
@@ -278,6 +278,9 @@ function MapFountains() {
 
   // Initialization (replaces componentDidMount)
   useEffect(() => {
+    let aborted = false;
+    let mapInstance: mapboxgl.Map | null = null;
+
     // initialize persisted settings
     localforage
       .getItem<number>("around")
@@ -285,9 +288,6 @@ function MapFountains() {
 
     localforage.getItem<boolean>("showRadius").then(v => {
       setShowRadius(v === null ? true : v);
-      if (v) {
-        showRadiusFnRef.current();
-      }
     });
 
     localforage
@@ -302,6 +302,8 @@ function MapFountains() {
       latitude: number;
       longitude: number;
     }) => {
+      if (aborted) return;
+
       const map = new mapboxgl.Map({
         container: "map",
         style:
@@ -318,6 +320,8 @@ function MapFountains() {
             ? false
             : true
       });
+
+      mapInstance = map;
 
       map.addControl(
         new mapboxgl.GeolocateControl({
@@ -384,6 +388,10 @@ function MapFountains() {
 
         updateAmenitiesFnRef.current();
 
+        if (showRadiusRef.current) {
+          showRadiusFnRef.current();
+        }
+
         (
           document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
         )?.click();
@@ -410,6 +418,15 @@ function MapFountains() {
     } else {
       positionCallback(defaultCoordinates);
     }
+
+    return () => {
+      aborted = true;
+      if (mapInstance) {
+        mapInstance.remove();
+        mapRef.current = null;
+        circleRadiusRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

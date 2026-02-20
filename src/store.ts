@@ -30,7 +30,7 @@ export const useAppStore = create<AppState>(set => ({
   isMenuOpen: false,
   errorMessage: null,
   showSearchThisAreaButton: false,
-  around: 0,
+  around: 1000,
   filters: {
     drinking_water: true,
     toilets: true,
@@ -39,7 +39,7 @@ export const useAppStore = create<AppState>(set => ({
     public_bath: true,
     device_charging_station: true
   },
-  showRadius: false,
+  showRadius: true,
   continousSearch: false,
 
   setOpenedNode: node => set({ openedNode: node }),
