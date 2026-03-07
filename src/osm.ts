@@ -15,7 +15,7 @@ const xmlBuilder = new Builder();
 export const osmAuth = new _osmAuth({
   client_id: "UzKLAo2Jaaq3uuekbiMxIBX4NQQk5NrVwqMtKZZT7tA",
   client_secret: "qzp6Ydy22GiZKq0WZ-prWj1AVI9fNGOLsQckEhqRr6o",
-  redirect_uri: "https://francescocioria.github.io/fontanelle/",
+  redirect_uri: "https://fontanelle.pages.dev/",
   scope: "write_api"
 });
 
