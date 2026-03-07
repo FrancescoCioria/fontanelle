@@ -1,9 +1,8 @@
-const statusColor = (color: string) =>
-  color === "gold" ? "#eab308" : color === "#d0d0d0" ? "#9ca3af" : "#8b5cf6";
+import statusColor from "./statusColor";
 
 export default (props: { color: string; size: number }) => (
   <svg width={props.size} height={props.size} viewBox="0 0 100 100">
-    <circle cx="50" cy="50" r="48" fill={statusColor(props.color)} stroke="white" strokeWidth="3" />
+    <circle cx="50" cy="50" r="48" fill={statusColor(props.color, "#8b5cf6")} stroke="white" strokeWidth="3" />
     <g fill="white">
       {/* Male figure */}
       <circle cx="38" cy="32" r="6" />

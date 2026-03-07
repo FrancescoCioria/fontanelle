@@ -31,7 +31,10 @@ function svgToImage(svgString: string): Promise<HTMLImageElement> {
       URL.revokeObjectURL(url);
       resolve(img);
     };
-    img.onerror = reject;
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load SVG image"));
+    };
     img.src = url;
   });
 }
