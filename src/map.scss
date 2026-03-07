@@ -103,8 +103,8 @@ $transition: 0.2s ease;
 // === Add Button ===
 .add-button {
   position: absolute;
-  top: 80px;
-  right: 16px;
+  bottom: 200px;
+  right: 20px;
   z-index: 100;
   background: $surface;
   border-radius: $radius-sm;
@@ -152,8 +152,8 @@ $transition: 0.2s ease;
 // === Menu Button ===
 .menu-button {
   position: absolute;
-  top: 30px;
-  right: 16px;
+  bottom: 148px;
+  right: 20px;
   z-index: 100;
   background: $surface;
   border-radius: $radius-sm;
