@@ -27,7 +27,7 @@ This is a React 18 + TypeScript 5 PWA that displays public amenities (drinking w
 
 ### OSM Integration (`osm.ts`)
 
-Authenticated users can create, update, and delete OSM nodes via the OSM API. Uses `osm-auth` for OAuth2 (client credentials in `osm.ts`). All mutations are wrapped in changesets. Node data is serialized to XML via `xml2js` Builder.
+Authenticated users can create, update, and delete OSM nodes via the OSM API. Uses `osm-auth` for OAuth2 in singlepage mode (redirect-based, no popup). The OAuth app is configured as a public client (no client_secret). All mutations are wrapped in changesets. Node data is serialized to XML via `xml2js` Builder.
 
 ### Key Types
 
@@ -37,7 +37,7 @@ Authenticated users can create, update, and delete OSM nodes via the OSM API. Us
 
 ### Component Structure
 
-- **`App.tsx`** — Root: renders ServiceWorkerWrapper + Map
+- **`App.tsx`** — Root: renders ServiceWorkerWrapper + Map. Handles OAuth redirect callback (completes token exchange when returning with `?code=`)
 - **`Map.tsx`** — Functional component. Owns map instance (`useRef`), node cache, search radius. Handles Mapbox initialization, GeoJSON source/layer amenity rendering, amenity fetching with debounce. Renders filter pills, menu button, add button, and search-this-area button
 - **`BottomSheet.tsx`** — Node detail view using vaul Drawer with drag handle. Shows amenity tags, directions link, edit button. Fetches fresh node data from OSM API on open
 - **`UpsertNode.tsx`** — Create/update/delete node flow. Two-phase UX: first pick coordinates (crosshair on map), then fill form. Renders different forms based on amenity type
