@@ -6,6 +6,7 @@ type AppState = {
   openedNode: OpenStreetMapNode | null;
   upsertNode: UpsertNode | null;
   isMenuOpen: boolean;
+  isAddMenuOpen: boolean;
   errorMessage: string | null;
   showSearchThisAreaButton: boolean;
   around: number;
@@ -16,6 +17,7 @@ type AppState = {
   setOpenedNode: (node: OpenStreetMapNode | null) => void;
   setUpsertNode: (node: UpsertNode | null) => void;
   setIsMenuOpen: (isOpen: boolean) => void;
+  setIsAddMenuOpen: (isOpen: boolean) => void;
   setErrorMessage: (msg: string | null) => void;
   setShowSearchThisAreaButton: (show: boolean) => void;
   setAround: (around: number) => void;
@@ -28,6 +30,7 @@ export const useAppStore = create<AppState>(set => ({
   openedNode: null,
   upsertNode: null,
   isMenuOpen: false,
+  isAddMenuOpen: false,
   errorMessage: null,
   showSearchThisAreaButton: false,
   around: 1000,
@@ -45,6 +48,7 @@ export const useAppStore = create<AppState>(set => ({
   setOpenedNode: node => set({ openedNode: node }),
   setUpsertNode: node => set({ upsertNode: node }),
   setIsMenuOpen: isOpen => set({ isMenuOpen: isOpen }),
+  setIsAddMenuOpen: isOpen => set({ isAddMenuOpen: isOpen }),
   setErrorMessage: msg => set({ errorMessage: msg }),
   setShowSearchThisAreaButton: show =>
     set({ showSearchThisAreaButton: show }),

@@ -226,7 +226,7 @@ export const UpsertNodePopup = (props: Props) => {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                zIndex: 99999,
+                zIndex: 10000,
                 pointerEvents: "none",
                 fontSize: 24
               }}
@@ -243,28 +243,29 @@ export const UpsertNodePopup = (props: Props) => {
                 left: 0,
                 right: 0,
                 bottom: 66,
-                zIndex: 99999
+                zIndex: 10000
               }}
             >
               <div
                 style={{
                   display: "flex",
-                  paddingTop: 16,
-                  paddingBottom: 16,
-                  paddingRight: 48,
-                  paddingLeft: 48,
-                  borderRadius: 8,
-                  background: "rgba(0, 0, 0, 0.1)"
+                  gap: 12,
+                  padding: "14px 32px",
+                  borderRadius: 16,
+                  background: "rgba(255, 255, 255, 0.95)",
+                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.12)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)"
                 }}
               >
                 <Button
                   label="Cancel"
-                  style={{ marginRight: 32 }}
                   onClick={close}
                 />
 
                 <Button
                   label="Confirm"
+                  variant="primary"
                   onClick={() => {
                     const coordinates = {
                       lat: props.map.getCenter().lat,
@@ -319,11 +320,12 @@ export const UpsertNodePopup = (props: Props) => {
               <div
                 style={{
                   marginTop: 16,
-                  padding: "8px 12px",
-                  background: "#ffebee",
-                  color: "#d32f2f",
-                  borderRadius: 4,
-                  fontSize: 14
+                  padding: "12px 16px",
+                  background: "#fef2f2",
+                  color: "#dc2626",
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontWeight: 500
                 }}
               >
                 {error}
@@ -332,9 +334,9 @@ export const UpsertNodePopup = (props: Props) => {
 
             <Button
               label={loading ? "Saving..." : "Save on OSM"}
+              variant="primary"
               style={{
                 marginTop: 24,
-                background: "#24A0ED",
                 opacity: loading ? 0.6 : 1
               }}
               onClick={() => {
@@ -367,10 +369,9 @@ export const UpsertNodePopup = (props: Props) => {
 
                 <Button
                   label={loading ? "Deleting..." : "Delete from OSM"}
+                  variant="danger"
                   style={{
                     marginTop: 24,
-                    background: "#f44336",
-                    color: "white",
                     opacity: loading ? 0.6 : 1
                   }}
                   onClick={() => {
@@ -402,9 +403,9 @@ export const UpsertNodePopup = (props: Props) => {
 
         <Button
           label="Log in OSM"
+          variant="primary"
           style={{
-            marginTop: 48,
-            marginLeft: "auto",
+            marginTop: 32,
             flexShrink: 0
           }}
           onClick={() => {

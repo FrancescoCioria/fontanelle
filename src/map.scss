@@ -1,3 +1,27 @@
+// === Z-index scale ===
+// Map controls (pills, buttons): 100
+// Popup overlay: 10000
+// Toast: 10001
+
+// === Design Tokens ===
+$primary: #0ea5e9;
+$primary-dark: #0284c7;
+$primary-light: #e0f2fe;
+$danger: #ef4444;
+$danger-dark: #dc2626;
+$surface: #ffffff;
+$text: #1e293b;
+$text-secondary: #64748b;
+$border: #e2e8f0;
+$shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+$radius-sm: 10px;
+$radius-md: 16px;
+$radius-lg: 24px;
+$transition: 0.2s ease;
+
+// === Map ===
 #map {
   position: relative;
   overflow: hidden;
@@ -8,157 +32,441 @@
   }
 
   .mapboxgl-ctrl-bottom-right {
-    right: 7px;
+    right: 10px;
+    bottom: 10px;
 
-    .mapboxgl-ctrl-group > button {
-      width: 40px;
-      height: 40px;
+    .mapboxgl-ctrl-group {
+      border-radius: $radius-sm;
+      box-shadow: $shadow-md;
+      border: none;
+      overflow: hidden;
+
+      > button {
+        width: 44px;
+        height: 44px;
+        border: none !important;
+        transition: background $transition;
+
+        &:active {
+          background: #f1f5f9;
+        }
+
+        + button {
+          border-top: 1px solid $border !important;
+        }
+      }
     }
   }
 }
 
+// === Filter Pills ===
+.filter-pills {
+  position: fixed;
+  top: 28px;
+  left: 0;
+  right: 60px;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 4px 12px;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.filter-pill {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border: 1.5px solid;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background $transition, color $transition, transform $transition;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+  outline: none;
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+// === Add Button ===
+.add-button {
+  position: absolute;
+  top: 80px;
+  right: 16px;
+  z-index: 100;
+  background: $surface;
+  border-radius: $radius-sm;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  box-shadow: $shadow-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow $transition;
+  color: $text;
+
+  &:active {
+    box-shadow: $shadow-sm;
+  }
+}
+
+// === Search This Area ===
 .search-this-area-button {
   position: fixed;
-  z-index: 9999999;
-  height: 40px;
+  z-index: 100;
+  height: 44px;
   bottom: 54px;
   left: 50%;
   transform: translateX(-50%);
   padding: 0 24px;
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  background: $primary;
+  color: $surface;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 22px;
+  box-shadow: $shadow-md;
   cursor: pointer;
+  transition: background $transition, transform $transition;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    background: $primary-dark;
+    transform: translateX(-50%) scale(0.97);
+  }
 }
 
+// === Menu Button ===
 .menu-button {
   position: absolute;
   top: 30px;
   right: 16px;
-  z-index: 9999999;
-  background: white;
-  border-radius: 4px;
-  width: 40px;
-  height: 40px;
+  z-index: 100;
+  background: $surface;
+  border-radius: $radius-sm;
+  width: 44px;
+  height: 44px;
   cursor: pointer;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  box-shadow: $shadow-md;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow $transition;
+
+  &:active {
+    box-shadow: $shadow-sm;
+  }
 }
 
+// === Separator ===
 .separator {
   height: 1px;
-  background: #e0e0e0;
+  background: $border;
   margin: 8px 0;
   flex-shrink: 0 !important;
 }
 
+// === Popup ===
 .popup {
-  z-index: 9999999;
+  z-index: 10000;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   cursor: default;
+  animation: fadeIn 0.2s ease;
 
   .popup-content {
-    background: white;
-    border-radius: 16px;
-    padding: 32px 24px;
-    width: 80vw;
-    max-width: 600px;
-    max-height: 80%;
+    background: $surface;
+    border-radius: $radius-lg;
+    padding: 28px 24px;
+    width: 88vw;
+    max-width: 420px;
+    max-height: 85vh;
     overflow: auto;
+    box-shadow: $shadow-lg;
+    animation: slideUp 0.3s ease;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 
-    .menu-item-label {
-      margin-top: 24px;
-      margin-bottom: 8px;
-      user-select: none;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// === Select ===
+.select {
+  .select-label {
+    margin-top: 20px;
+    margin-bottom: 6px;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: $text-secondary;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  select {
+    height: 44px;
+    border: 1.5px solid $border;
+    border-radius: $radius-sm;
+    padding: 0 12px;
+    font-size: 15px;
+    color: $text;
+    background: $surface;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color $transition, box-shadow $transition;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      box-shadow: 0 0 0 3px rgba($primary, 0.15);
     }
   }
 }
 
-.select {
-  .select-label {
-    margin-top: 24px;
-    margin-bottom: 8px;
-    user-select: none;
-  }
-
-  select {
-    height: 40px;
-  }
-}
-
+// === Checkbox ===
 .checkbox {
   height: 48px;
   cursor: pointer;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: $radius-sm;
+  padding: 0 4px;
+  transition: background $transition;
+
+  &:active {
+    background: $primary-light;
+  }
 
   input {
-    width: 14px;
-    height: 14px;
+    width: 20px;
+    height: 20px;
     margin: 0;
+    accent-color: $primary;
+    border-radius: 4px;
+    cursor: pointer;
   }
 
   .checkbox-label {
     margin: 0;
-    margin-left: 8px;
-    font-size: 16px;
+    margin-left: 12px;
+    font-size: 15px;
+    color: $text;
   }
 }
 
+// === Input ===
 .input {
   .input-label {
-    margin-top: 24px;
-    margin-bottom: 8px;
+    margin-top: 20px;
+    margin-bottom: 6px;
     user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: $text-secondary;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
 
   input {
-    height: 40px;
+    height: 44px;
+    border: 1.5px solid $border;
+    border-radius: $radius-sm;
+    padding: 0 12px;
+    font-size: 15px;
+    color: $text;
+    background: $surface;
+    transition: border-color $transition, box-shadow $transition;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      box-shadow: 0 0 0 3px rgba($primary, 0.15);
+    }
   }
 }
 
+// === Button ===
 .button {
   cursor: pointer;
-  height: 40px;
+  height: 44px;
   flex-shrink: 0;
-  border: 1px solid rgba(0, 0, 0, 0.2) !important;
-  border-radius: 4px;
+  border: none !important;
+  border-radius: $radius-sm;
+  background: $primary-light;
+  color: $primary-dark;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 16px;
+  transition: background $transition, transform $transition, box-shadow $transition;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    background: #c5e5f8;
+    transform: scale(0.97);
+  }
 }
 
+.button-primary {
+  background: $primary;
+  color: $surface;
+  box-shadow: $shadow-sm;
+
+  &:active {
+    background: $primary-dark;
+    transform: scale(0.97);
+  }
+}
+
+.button-danger {
+  background: $danger;
+  color: $surface;
+  box-shadow: $shadow-sm;
+
+  &:active {
+    background: $danger-dark;
+    transform: scale(0.97);
+  }
+}
+
+// === Bottom Sheet overrides ===
 div[data-rsbs-overlay] {
-  border-top-left-radius: 16px !important;
-  border-top-right-radius: 16px !important;
+  border-top-left-radius: $radius-md !important;
+  border-top-right-radius: $radius-md !important;
 }
 
+// === Typography ===
 h4 {
   margin-bottom: 8px;
+  color: $text;
+  font-size: 16px;
+  font-weight: 700;
 
   &:first-child {
     margin-top: 0;
   }
 }
 
+h2 {
+  color: $text;
+  font-weight: 700;
+}
+
 svg {
-  // buffered-rendering: static;
   contain: paint;
 }
 
+// === Toast ===
 .toast {
   position: fixed;
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 99999999;
-  background: #d32f2f;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
+  z-index: 10001;
+  background: $text;
+  color: $surface;
+  padding: 14px 24px;
+  border-radius: $radius-sm;
   font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-weight: 500;
+  box-shadow: $shadow-lg;
   cursor: pointer;
-  max-width: 80vw;
+  max-width: 85vw;
   text-align: center;
+  animation: slideUp 0.3s ease;
+}
+
+// === Radius Control ===
+.radius-control {
+  margin-top: 16px;
+  background: #f8fafc;
+  border-radius: $radius-sm;
+  padding: 16px;
+
+  .radius-control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .radius-control-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: $text;
+  }
+
+  .radius-control-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: $primary;
+    background: $primary-light;
+    padding: 2px 10px;
+    border-radius: 12px;
+  }
+}
+
+// === Range input ===
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: $border;
+  outline: none;
+  margin: 0;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: $primary;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba($primary, 0.3);
+    border: 3px solid $surface;
+  }
+
+  &::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: $primary;
+    cursor: pointer;
+    border: 3px solid $surface;
+    box-shadow: 0 2px 6px rgba($primary, 0.3);
+  }
 }

@@ -59,6 +59,8 @@ function MapFountains() {
   const setShowSearchThisAreaButton = useAppStore(
     s => s.setShowSearchThisAreaButton
   );
+  const isAddMenuOpen = useAppStore(s => s.isAddMenuOpen);
+  const setIsAddMenuOpen = useAppStore(s => s.setIsAddMenuOpen);
   const errorMessage = useAppStore(s => s.errorMessage);
   const setErrorMessage = useAppStore(s => s.setErrorMessage);
 
@@ -216,7 +218,11 @@ function MapFountains() {
           {
             editable: false,
             minRadius: 0,
-            fillColor: "transparent"
+            fillColor: "#0ea5e9",
+            fillOpacity: 0.06,
+            strokeColor: "#0ea5e9",
+            strokeWeight: 1.5,
+            strokeOpacity: 0.3
           }
         ).addTo(map);
       }
@@ -445,14 +451,14 @@ function MapFountains() {
 
   // --- Render ---
 
-  const filterCheckboxes = amenities.map(amenity => (
-    <Checkbox
-      key={amenity}
-      value={filters[amenity]}
-      label={getAmenityTitle(amenity)}
-      onChange={show => setFilter(amenity, show)}
-    />
-  ));
+  const pillConfig: Record<Amenity, { label: string; color: string }> = {
+    drinking_water: { label: "Water", color: "#0ea5e9" },
+    toilets: { label: "Toilets", color: "#8b5cf6" },
+    shower: { label: "Showers", color: "#f97316" },
+    bicycle_repair_station: { label: "Bike Repair", color: "#10b981" },
+    public_bath: { label: "Baths", color: "#ec4899" },
+    device_charging_station: { label: "Charging", color: "#eab308" }
+  };
 
   return (
     <div
@@ -468,6 +474,27 @@ function MapFountains() {
       </div>
 
       <div id="map" style={{ display: "flex", flexGrow: 1 }} />
+
+      <div className="filter-pills">
+        {amenities.map(amenity => {
+          const { label, color } = pillConfig[amenity];
+          const active = filters[amenity];
+          return (
+            <button
+              key={amenity}
+              className="filter-pill"
+              style={{
+                borderColor: color,
+                color: active ? "#fff" : color,
+                backgroundColor: active ? color : "#fff"
+              }}
+              onClick={() => setFilter(amenity, !active)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
       {openedNode && <BottomSheet />}
 
@@ -523,19 +550,21 @@ function MapFountains() {
         onClick={() => setIsMenuOpen(true)}
       >
         <MenuIcon />
+      </div>
 
-        {/* popup */}
-        <Popup
-          onClose={() => {
-            setIsMenuOpen(false);
-          }}
-          isOpen={isMenuOpen}
-        >
-          <h4>Search options</h4>
+      <Popup
+        onClose={() => {
+          setIsMenuOpen(false);
+        }}
+        isOpen={isMenuOpen}
+      >
+        <h4>Search options</h4>
 
-          <span style={{ marginTop: 16, marginBottom: 8 }}>
-            Around radius: <b>{around} meters</b>
-          </span>
+        <div className="radius-control">
+          <div className="radius-control-header">
+            <span className="radius-control-label">Search radius</span>
+            <span className="radius-control-value">{around >= 1000 ? `${(around / 1000).toFixed(around % 1000 === 0 ? 0 : 1)} km` : `${around} m`}</span>
+          </div>
           <input
             value={around}
             type="range"
@@ -555,49 +584,59 @@ function MapFountains() {
               localforage.setItem("around", newAround);
             }}
           />
+        </div>
 
-          <div style={{ height: 24 }} />
+        <div style={{ height: 16 }} />
 
-          <Checkbox
-            value={showRadius}
-            label="Show radius in map"
-            onChange={sr => {
-              setShowRadius(sr);
-              localforage.setItem("showRadius", sr);
+        <Checkbox
+          value={showRadius}
+          label="Show radius in map"
+          onChange={sr => {
+            setShowRadius(sr);
+            localforage.setItem("showRadius", sr);
 
-              if (sr) {
-                showRadiusFn();
-              } else {
-                hideRadius();
-              }
-            }}
-          />
+            if (sr) {
+              showRadiusFn();
+            } else {
+              hideRadius();
+            }
+          }}
+        />
 
-          <Checkbox
-            value={continousSearch}
-            label="Enable continous search"
-            onChange={cs => {
-              setContinousSearch(cs);
-              setShowSearchThisAreaButton(false);
-              localforage.setItem("continousSearch", cs);
-            }}
-          />
+        <Checkbox
+          value={continousSearch}
+          label="Enable continous search"
+          onChange={cs => {
+            setContinousSearch(cs);
+            setShowSearchThisAreaButton(false);
+            localforage.setItem("continousSearch", cs);
+          }}
+        />
 
-          <div className="separator" />
+      </Popup>
 
-          <h4 style={{ marginBottom: 8 }}>Filters</h4>
-          {filterCheckboxes}
+      {!upsertNode && (
+        <div
+          className="add-button"
+          onClick={() => setIsAddMenuOpen(true)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </div>
+      )}
 
-          <div className="separator" />
-
-          <h4>Add new amenity (OSM account required)</h4>
-          {amenities.map((amenity, i) => (
+      <Popup onClose={() => setIsAddMenuOpen(false)} isOpen={isAddMenuOpen}>
+        <h4 style={{ marginTop: 0 }}>Add new amenity</h4>
+        <span style={{ fontSize: 13, color: "#64748b" }}>OSM account required</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+          {amenities.map(amenity => (
             <Button
               key={amenity}
-              label={`Add ${getAmenityTitle(amenity)}`}
-              style={{ marginTop: i === 0 ? 16 : 24 }}
+              label={getAmenityTitle(amenity)}
               onClick={() => {
-                setIsMenuOpen(false);
+                setIsAddMenuOpen(false);
                 setUpsertNode({
                   type: "create_without_coordinates",
                   node: {
@@ -607,8 +646,8 @@ function MapFountains() {
               }}
             />
           ))}
-        </Popup>
-      </div>
+        </div>
+      </Popup>
 
       {errorMessage && (
         <Toast

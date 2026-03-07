@@ -76,9 +76,18 @@ export const Button = (props: {
   label: string;
   onClick: () => void;
   style?: React.CSSProperties;
+  variant?: "default" | "primary" | "danger";
 }) => {
+  const variant = props.variant || "default";
+  const className =
+    variant === "primary"
+      ? "button button-primary"
+      : variant === "danger"
+        ? "button button-danger"
+        : "button";
+
   return (
-    <button className="button" style={props.style} onClick={props.onClick}>
+    <button className={className} style={props.style} onClick={props.onClick}>
       {props.label}
     </button>
   );
