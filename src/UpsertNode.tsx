@@ -409,8 +409,12 @@ export const UpsertNodePopup = (props: Props) => {
             flexShrink: 0
           }}
           onClick={() => {
-            osmAuth.authenticate(() => {
-              updateState({ ...state });
+            osmAuth.authenticate((err: any) => {
+              if (err) {
+                useAppStore.getState().setErrorMessage("OSM login failed. Please try again.");
+              } else {
+                updateState({ ...state });
+              }
             });
           }}
         />
