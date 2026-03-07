@@ -301,8 +301,7 @@ function MapFountains() {
       .then(v => setContinousSearch(v || false));
 
     // initialize map
-    mapboxgl.accessToken =
-      "pk.eyJ1IjoiZnJhbmNlc2NvY2lvcmlhIiwiYSI6ImNqcThyejR6ODA2ZDk0M25rZzZjcGo4ZmcifQ.yRWHQbG1dJjDp43d01bBOw";
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
     const positionCallback = (coords: {
       latitude: number;
