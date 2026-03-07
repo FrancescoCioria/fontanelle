@@ -1,6 +1,5 @@
 import * as localforage from "localforage";
 import uniqBy from "lodash/uniqBy";
-import flatten from "lodash/flatten";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
@@ -92,59 +91,85 @@ export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
   localforage.setItem("amenities", nodes);
 };
 
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://overpass.osm.ch/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter"
+];
+
+let currentEndpointIndex = 0;
+
 const fetchWithRetry = async (
-  url: string,
-  retries: number = 3
+  query: string,
+  signal?: AbortSignal
 ): Promise<Response> => {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const res = await fetch(url);
+  const totalAttempts = OVERPASS_ENDPOINTS.length;
 
-    if (res.ok) {
-      return res;
-    }
+  for (let attempt = 0; attempt < totalAttempts; attempt++) {
+    const endpoint =
+      OVERPASS_ENDPOINTS[
+        (currentEndpointIndex + attempt) % OVERPASS_ENDPOINTS.length
+      ];
 
-    if (res.status === 429 || res.status >= 500) {
-      if (attempt < retries - 1) {
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    try {
+      const res = await fetch(`${endpoint}?data=${query}&output`, { signal });
+
+      if (res.ok) {
+        // Remember this working endpoint for next time
+        currentEndpointIndex =
+          (currentEndpointIndex + attempt) % OVERPASS_ENDPOINTS.length;
+        return res;
+      }
+
+      if (res.status === 429 || res.status >= 500) {
+        // Try next endpoint
         continue;
       }
-    }
 
-    throw new Error(`Overpass API error: ${res.status} ${res.statusText}`);
+      throw new Error(`Overpass API error: ${res.status} ${res.statusText}`);
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      if (attempt === totalAttempts - 1) throw e;
+      // Network error — try next endpoint
+    }
   }
 
-  throw new Error("Overpass API: max retries reached");
+  throw new Error("All Overpass API endpoints failed");
 };
 
+let currentRequest: AbortController | null = null;
+
 export default async (options: Options): Promise<OpenStreetMapNode[]> => {
-  const res = await Promise.all(
-    [
-      amenities.slice(0, amenities.length / 2),
-      amenities.slice(amenities.length / 2)
-    ].map(async amenitiesGroup => {
-      const formData = `
-        [out:json];
-        (nwr["amenity"~"${amenitiesGroup.join("|")}"](around:${
-        options.around
-      },${options.lat},${options.lng}););
-        out;>;out;
-      `;
+  if (currentRequest) {
+    currentRequest.abort();
+  }
 
-      const OverpassApiService = "https://overpass-api.de/api/interpreter";
+  const controller = new AbortController();
+  currentRequest = controller;
 
-      const res = await fetchWithRetry(
-        `${OverpassApiService}?data=${formData}&output`
-      );
+  const query = `
+    [out:json];
+    (nwr["amenity"~"${amenities.join("|")}"](around:${
+    options.around
+  },${options.lat},${options.lng}););
+    out;>;out;
+  `;
 
-      const json: { elements: OpenStreetMapNode[] } = await res.json();
+  try {
+    const res = await fetchWithRetry(query, controller.signal);
 
-      updateCachedItems(json.elements);
+    const json: { elements: OpenStreetMapNode[] } = await res.json();
 
-      return json.elements.filter(v => v.tags);
-    })
-  );
+    updateCachedItems(json.elements);
 
-  return flatten(res);
+    return json.elements.filter(v => v.tags);
+  } finally {
+    if (currentRequest === controller) {
+      currentRequest = null;
+    }
+  }
 };
 
 export const getAmenityColor = (amenityTags: AmenityTags): string => {

@@ -272,7 +272,7 @@ function MapFountains() {
         } else {
           setShowSearchThisAreaButton(false);
         }
-      }, 1000),
+      }, 2000),
     []
   );
 
