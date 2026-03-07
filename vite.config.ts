@@ -4,7 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
-  base: "/fontanelle/",
+  base: "/",
   plugins: [
     react(),
     nodePolyfills({

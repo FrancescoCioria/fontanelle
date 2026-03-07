@@ -142,7 +142,7 @@ function MapFountains() {
   function addAmenitiesMarkers(nodes: OpenStreetMapNode[]) {
     let changed = false;
     nodes.forEach(node => {
-      if (!nodesRef.current[node.id]) {
+      if (node.tags?.amenity && !nodesRef.current[node.id]) {
         nodesRef.current[node.id] = node;
         changed = true;
       }
@@ -190,7 +190,8 @@ function MapFountains() {
         lng: map.getCenter().lng
       })
         .then(addAmenitiesMarkers)
-        .catch(() => {
+        .catch(e => {
+          if (e instanceof DOMException && e.name === "AbortError") return;
           setErrorMessage("Failed to load amenities. Please try again.");
         })
         .finally(() => {
@@ -272,7 +273,7 @@ function MapFountains() {
         } else {
           setShowSearchThisAreaButton(false);
         }
-      }, 2000),
+      }, 800),
     []
   );
 
