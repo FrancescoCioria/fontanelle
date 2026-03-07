@@ -72,6 +72,7 @@ $transition: 0.2s ease;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding: 4px 12px;
+  pointer-events: none;
 
   &::-webkit-scrollbar {
     display: none;
@@ -79,6 +80,7 @@ $transition: 0.2s ease;
 }
 
 .filter-pill {
+  pointer-events: auto;
   flex-shrink: 0;
   height: 34px;
   padding: 0 14px;

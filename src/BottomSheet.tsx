@@ -146,7 +146,7 @@ export default () => {
                 marginBottom: 16
               }}
             >
-              {getAmenityMarker(node.tags, 44)}
+              {getAmenityMarker(node.tags, 56)}
               <span
                 style={{
                   marginLeft: 14,
