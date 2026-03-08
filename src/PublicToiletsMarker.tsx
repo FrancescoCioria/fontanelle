@@ -11,7 +11,7 @@ export default (props: { color: string; size: number }) => (
       <rect x="39" y="55" width="4" height="14" rx="2" />
       {/* Female figure */}
       <circle cx="62" cy="32" r="6" />
-      <path d="M55 40h14l-2 18h-10z" />
+      <path d="M57 40h10l2 18h-14z" />
       <rect x="57" y="55" width="4" height="14" rx="2" />
       <rect x="63" y="55" width="4" height="14" rx="2" />
     </g>
