@@ -109,7 +109,7 @@ $transition: 0.2s ease;
 // === Add Button ===
 .add-button {
   position: absolute;
-  bottom: 220px;
+  bottom: 200px;
   right: 20px;
   z-index: 100;
   background: $surface;
@@ -125,6 +125,10 @@ $transition: 0.2s ease;
   transition: box-shadow $transition;
   color: $text;
 
+  @media (max-width: 768px) {
+    bottom: 220px;
+  }
+
   &:active {
     box-shadow: $shadow-sm;
   }
@@ -135,8 +139,12 @@ $transition: 0.2s ease;
   position: fixed;
   z-index: 100;
   height: 44px;
-  bottom: 74px;
+  bottom: 54px;
   left: 50%;
+
+  @media (max-width: 768px) {
+    bottom: 74px;
+  }
   transform: translateX(-50%);
   padding: 0 24px;
   background: $primary;
@@ -158,7 +166,7 @@ $transition: 0.2s ease;
 // === Menu Button ===
 .menu-button {
   position: absolute;
-  bottom: 168px;
+  bottom: 148px;
   right: 20px;
   z-index: 100;
   background: $surface;
@@ -169,6 +177,10 @@ $transition: 0.2s ease;
   box-shadow: $shadow-md;
   -webkit-tap-highlight-color: transparent;
   transition: box-shadow $transition;
+
+  @media (max-width: 768px) {
+    bottom: 168px;
+  }
 
   &:active {
     box-shadow: $shadow-sm;
@@ -337,6 +349,10 @@ $transition: 0.2s ease;
   font-size: 15px;
   font-weight: 600;
   padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   transition: background $transition, transform $transition, box-shadow $transition;
   -webkit-tap-highlight-color: transparent;
 
