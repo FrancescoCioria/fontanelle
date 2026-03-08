@@ -5,7 +5,7 @@ import getOpenStreetMapAmenities, {
   updateCachedItems,
   Amenity,
   getAmenityTitle,
-  getAmenityMarker,
+  getAmenityIcon,
   amenities
 } from "./getOpenStreetMapAmenities";
 import distance from "@turf/distance";
@@ -636,7 +636,7 @@ function MapFountains() {
             <Button
               key={amenity}
               label={getAmenityTitle(amenity)}
-              icon={getAmenityMarker({ amenity } as any, 24)}
+              icon={getAmenityIcon(amenity, 24)}
               onClick={() => {
                 setIsAddMenuOpen(false);
                 setUpsertNode({

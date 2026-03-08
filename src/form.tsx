@@ -89,7 +89,7 @@ export const Button = (props: {
 
   return (
     <button className={className} style={props.style} onClick={props.onClick}>
-      {props.icon && <span style={{ display: "flex", flexShrink: 0 }}>{props.icon}</span>}
+      {props.icon}
       {props.label}
     </button>
   );

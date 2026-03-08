@@ -208,6 +208,9 @@ export const getAmenityColor = (amenityTags: AmenityTags): string => {
   return closed() || notPublic() || feeRequired() || "white";
 };
 
+export const getAmenityIcon = (amenity: Amenity, size: number): JSX.Element =>
+  getAmenityMarker({ amenity } as AmenityTags, size);
+
 export const getAmenityMarker = (
   amenityTags: AmenityTags,
   size: number
