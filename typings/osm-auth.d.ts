@@ -35,7 +35,7 @@ declare namespace OSMAuth {
   interface OSMAuthOptions {
     scope: string;
     client_id: string;
-    client_secret: string;
+    client_secret?: string;
     redirect_uri: string;
     access_token?: string;
     url?: string;
