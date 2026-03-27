@@ -103,8 +103,13 @@ let currentEndpointIndex = 0;
 
 const fetchWithRetry = async (
   query: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  around?: number
 ): Promise<Response> => {
+  const timeoutMs = Math.min(
+    10000 + ((around || 1000) - 1000) * (20000 / 9000),
+    30000
+  );
   const totalAttempts = OVERPASS_ENDPOINTS.length;
 
   for (let attempt = 0; attempt < totalAttempts; attempt++) {
@@ -114,7 +119,13 @@ const fetchWithRetry = async (
       ];
 
     try {
-      const res = await fetch(`${endpoint}?data=${query}&output`, { signal });
+      const timeout = AbortSignal.timeout(timeoutMs);
+      const combinedSignal = signal
+        ? AbortSignal.any([signal, timeout])
+        : timeout;
+      const res = await fetch(`${endpoint}?data=${query}&output`, {
+        signal: combinedSignal
+      });
 
       if (res.ok) {
         // Remember this working endpoint for next time
@@ -158,7 +169,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   `;
 
   try {
-    const res = await fetchWithRetry(query, controller.signal);
+    const res = await fetchWithRetry(query, controller.signal, options.around);
 
     const json: { elements: OpenStreetMapNode[] } = await res.json();
 
