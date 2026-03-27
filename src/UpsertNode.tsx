@@ -318,6 +318,7 @@ export const UpsertNodePopup = (props: Props) => {
 
             {error && (
               <div
+                role="alert"
                 style={{
                   marginTop: 16,
                   padding: "12px 16px",

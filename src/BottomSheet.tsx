@@ -30,6 +30,7 @@ const Amenity = (props: { label: string; value: string }): JSX.Element => {
         <a
           href={props.value}
           target="_blank"
+          rel="noopener noreferrer"
           style={{
             fontSize: 15,
             wordBreak: "break-all",

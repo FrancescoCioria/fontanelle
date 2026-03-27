@@ -11,13 +11,15 @@ export const Select = <V extends string>(props: {
   onChange: (value: V) => void;
   options: Option<V>[];
 }) => {
+  const id = React.useId();
   return (
     <div
       className="select"
       style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}
     >
-      <span className="select-label">{props.label}</span>
+      <label className="select-label" htmlFor={id}>{props.label}</label>
       <select
+        id={id}
         value={props.value}
         onChange={e => props.onChange(e.currentTarget.value as V)}
       >
@@ -37,13 +39,15 @@ export const Input = (props: {
   label: string;
   onChange: (value: string) => void;
 }) => {
+  const id = React.useId();
   return (
     <div
       className="input"
       style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}
     >
-      <span className="input-label">{props.label}</span>
+      <label className="input-label" htmlFor={id}>{props.label}</label>
       <input
+        id={id}
         value={props.value || ""}
         onChange={e => props.onChange(e.currentTarget.value)}
       />
@@ -55,22 +59,24 @@ export const Checkbox = (props: {
   label: string;
   value: boolean;
   onChange: (value: boolean) => void;
-}) => (
-  <div
-    className="checkbox"
-    style={{ display: "flex", alignItems: "center", flexShrink: 0 }}
-    onClick={() => props.onChange(!props.value)}
-  >
-    <input
-      checked={props.value}
-      type="checkbox"
-      onChange={e => {
-        props.onChange(e.currentTarget.checked);
-      }}
-    />
-    <span className="checkbox-label">{props.label}</span>
-  </div>
-);
+}) => {
+  const id = React.useId();
+  return (
+    <label
+      className="checkbox"
+      htmlFor={id}
+      style={{ display: "flex", alignItems: "center", flexShrink: 0 }}
+    >
+      <input
+        id={id}
+        checked={props.value}
+        type="checkbox"
+        onChange={e => props.onChange(e.currentTarget.checked)}
+      />
+      <span className="checkbox-label">{props.label}</span>
+    </label>
+  );
+};
 
 export const Button = (props: {
   label: string;

@@ -107,6 +107,14 @@ $transition: 0.2s ease;
 }
 
 // === Add Button ===
+.add-button,
+.menu-button,
+.search-this-area-button {
+  border: none;
+  font: inherit;
+  padding: 0;
+}
+
 .add-button {
   position: absolute;
   bottom: 200px;

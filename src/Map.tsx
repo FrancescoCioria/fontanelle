@@ -500,7 +500,7 @@ function MapFountains() {
       {openedNode && <BottomSheet />}
 
       {showSearchThisAreaButton && openedNode === null && (
-        <div
+        <button
           className="search-this-area-button"
           style={{
             display: "flex",
@@ -517,7 +517,7 @@ function MapFountains() {
           }}
         >
           Search this area
-        </div>
+        </button>
       )}
 
       {upsertNode && mapRef.current && (
@@ -540,8 +540,9 @@ function MapFountains() {
         />
       )}
 
-      <div
+      <button
         className="menu-button"
+        aria-label="Search options"
         style={{
           display: "flex",
           justifyContent: "center",
@@ -551,13 +552,14 @@ function MapFountains() {
         onClick={() => setIsMenuOpen(true)}
       >
         <MenuIcon />
-      </div>
+      </button>
 
       <Popup
         onClose={() => {
           setIsMenuOpen(false);
         }}
         isOpen={isMenuOpen}
+        aria-label="Search options"
       >
         <h4>Search options</h4>
 
@@ -567,6 +569,7 @@ function MapFountains() {
             <span className="radius-control-value">{around >= 1000 ? `${(around / 1000).toFixed(around % 1000 === 0 ? 0 : 1)} km` : `${around} m`}</span>
           </div>
           <input
+            aria-label="Search radius"
             value={around}
             type="range"
             min="500"
@@ -617,18 +620,19 @@ function MapFountains() {
       </Popup>
 
       {!upsertNode && (
-        <div
+        <button
           className="add-button"
+          aria-label="Add new amenity"
           onClick={() => setIsAddMenuOpen(true)}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-        </div>
+        </button>
       )}
 
-      <Popup onClose={() => setIsAddMenuOpen(false)} isOpen={isAddMenuOpen}>
+      <Popup onClose={() => setIsAddMenuOpen(false)} isOpen={isAddMenuOpen} aria-label="Add new amenity">
         <h4 style={{ marginTop: 0 }}>Add new amenity</h4>
         <span style={{ fontSize: 13, color: "#64748b" }}>OSM account required</span>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>

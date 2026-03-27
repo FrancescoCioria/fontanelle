@@ -13,7 +13,7 @@ const Toast = ({ message, onDismiss, duration = 4000 }: Props) => {
   }, [onDismiss, duration]);
 
   return (
-    <div className="toast" onClick={onDismiss}>
+    <div className="toast" role="alert" onClick={onDismiss}>
       {message}
     </div>
   );
