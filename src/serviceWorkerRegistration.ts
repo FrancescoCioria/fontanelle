@@ -61,7 +61,7 @@ export function register(config?: Config) {
 
 function registerValidSW(swUrl: string, config?: Config) {
   navigator.serviceWorker
-    .register(swUrl, { scope: "/fontanelle/" })
+    .register(swUrl)
     .then(registration => {
       console.log(registration.scope);
       registration.onupdatefound = () => {
