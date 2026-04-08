@@ -286,7 +286,6 @@ function MapFountains() {
 
   // Initialization (replaces componentDidMount)
   useEffect(() => {
-    let aborted = false;
     let mapInstance: mapboxgl.Map | null = null;
 
     // initialize persisted settings
@@ -305,129 +304,128 @@ function MapFountains() {
     // initialize map
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-    const positionCallback = (coords: {
-      latitude: number;
-      longitude: number;
-    }) => {
-      if (aborted) return;
+    // Use saved position or default to Milan
+    let initial = { lat: 45.4642, lng: 9.19 };
+    try {
+      const saved = localStorage.getItem("lastPosition");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+          initial = parsed;
+        }
+      }
+    } catch { /* ignore corrupt data */ }
 
-      const map = new mapboxgl.Map({
-        container: "map",
-        style:
-          "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
-        center: {
-          lat: coords.latitude,
-          lng: coords.longitude
+    const map = new mapboxgl.Map({
+      container: "map",
+      style:
+        "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
+      center: initial,
+      zoom: 15.0,
+      scrollZoom:
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        )
+          ? false
+          : true
+    });
+
+    mapInstance = map;
+
+    map.addControl(
+      new mapboxgl.GeolocateControl({
+        positionOptions: {
+          enableHighAccuracy: true
         },
-        zoom: 15.0,
-        scrollZoom:
-          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-            navigator.userAgent
-          )
-            ? false
-            : true
+        showUserHeading: true,
+        showAccuracyCircle: true,
+        trackUserLocation: true
+      }),
+      "bottom-right"
+    );
+
+    map.addControl(
+      new mapboxgl.NavigationControl({
+        showZoom: false,
+        showCompass: true
+      }),
+      "bottom-right"
+    );
+
+    map.addControl(new mapboxgl.ScaleControl());
+
+    map.on("load", async () => {
+      mapRef.current = map;
+
+      await registerMapIcons(map);
+
+      map.addSource(AMENITIES_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] }
       });
 
-      mapInstance = map;
+      map.addLayer({
+        id: AMENITIES_LAYER,
+        type: "symbol",
+        source: AMENITIES_SOURCE,
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "symbol-sort-key": ["get", "sortOrder"]
+        }
+      });
 
-      map.addControl(
-        new mapboxgl.GeolocateControl({
-          positionOptions: {
-            enableHighAccuracy: true
-          },
-          showUserHeading: true,
-          showAccuracyCircle: true,
-          trackUserLocation: true
-        }),
-        "bottom-right"
-      );
-
-      map.addControl(
-        new mapboxgl.NavigationControl({
-          showZoom: false,
-          showCompass: true
-        }),
-        "bottom-right"
-      );
-
-      map.addControl(new mapboxgl.ScaleControl());
-
-      map.on("load", async () => {
-        mapRef.current = map;
-
-        await registerMapIcons(map);
-
-        map.addSource(AMENITIES_SOURCE, {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] }
-        });
-
-        map.addLayer({
-          id: AMENITIES_LAYER,
-          type: "symbol",
-          source: AMENITIES_SOURCE,
-          layout: {
-            "icon-image": ["get", "icon"],
-            "icon-allow-overlap": true,
-            "icon-ignore-placement": true,
-            "symbol-sort-key": ["get", "sortOrder"]
+      // Click handler
+      map.on("click", AMENITIES_LAYER, e => {
+        const feature = e.features?.[0];
+        if (feature?.properties?.id) {
+          const node = nodesRef.current[feature.properties.id];
+          if (node) {
+            setOpenedNode(node);
           }
-        });
+        }
+      });
 
-        // Click handler
-        map.on("click", AMENITIES_LAYER, e => {
-          const feature = e.features?.[0];
-          if (feature?.properties?.id) {
-            const node = nodesRef.current[feature.properties.id];
-            if (node) {
-              setOpenedNode(node);
-            }
-          }
-        });
+      // Pointer cursor on hover
+      map.on("mouseenter", AMENITIES_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", AMENITIES_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+      });
 
-        // Pointer cursor on hover
-        map.on("mouseenter", AMENITIES_LAYER, () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", AMENITIES_LAYER, () => {
-          map.getCanvas().style.cursor = "";
-        });
+      updateAmenitiesFnRef.current();
 
-        updateAmenitiesFnRef.current();
+      if (showRadiusRef.current) {
+        showRadiusFnRef.current();
+      }
 
+      (
+        document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
+      )?.click();
+    });
+
+    map.on("move", () => {
+      updateAmenitiesDebounce();
+
+      requestAnimationFrame(() => {
         if (showRadiusRef.current) {
           showRadiusFnRef.current();
         }
-
-        (
-          document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
-        )?.click();
       });
+    });
 
-      map.on("move", () => {
-        updateAmenitiesDebounce();
-
-        requestAnimationFrame(() => {
-          if (showRadiusRef.current) {
-            showRadiusFnRef.current();
-          }
-        });
-      });
-    };
-
-    const defaultCoordinates = { latitude: 45.4642, longitude: 9.19 };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        e => positionCallback(e.coords),
-        () => positionCallback(defaultCoordinates)
+    // Save position on moveend for next app launch
+    map.on("moveend", () => {
+      const center = map.getCenter();
+      localStorage.setItem(
+        "lastPosition",
+        JSON.stringify({ lat: center.lat, lng: center.lng })
       );
-    } else {
-      positionCallback(defaultCoordinates);
-    }
+    });
 
     return () => {
-      aborted = true;
       if (mapInstance) {
         mapInstance.remove();
         mapRef.current = null;
