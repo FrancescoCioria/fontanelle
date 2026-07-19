@@ -15,7 +15,7 @@ Uses Vite with `vite-plugin-pwa` for service worker generation and `vite-plugin-
 
 Hosted on **Cloudflare Pages** at https://fontanelle.pages.dev.
 
-⚠️ `yarn deploy` in `package.json` is stale — it runs `gh-pages -d dist` and publishes to GitHub Pages (`homepage` still points at `francescocioria.github.io/fontanelle`). Deploy with the wrangler command below instead; the gh-pages target would also break OSM login, since the OAuth `redirect_uri` is registered on `fontanelle.pages.dev`. The Mapbox token is stored as a Cloudflare Pages secret (`VITE_MAPBOX_TOKEN`) and locally in `.env` (gitignored). Build with the env var: `VITE_MAPBOX_TOKEN=... yarn build`.
+⚠️ Deploy only there. The OSM OAuth `redirect_uri` is registered on that exact domain, so OSM login breaks on any other host. A stale `yarn deploy` script publishing to GitHub Pages was removed for this reason — don't reintroduce a second target. The Mapbox token is stored as a Cloudflare Pages secret (`VITE_MAPBOX_TOKEN`) and locally in `.env` (gitignored). Build with the env var: `VITE_MAPBOX_TOKEN=... yarn build`.
 
 ## Architecture
 

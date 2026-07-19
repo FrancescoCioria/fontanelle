@@ -38,10 +38,9 @@ npx wrangler pages deploy dist --project-name fontanelle
 
 Il token Mapbox è anche un secret di Cloudflare Pages (`VITE_MAPBOX_TOKEN`).
 
-> ⚠️ Lo script `yarn deploy` in `package.json` è obsoleto: punta a GitHub Pages
-> (`gh-pages`), non a Cloudflare. Non usarlo — oltre a pubblicare nel posto
-> sbagliato, il login OpenStreetMap non funzionerebbe, perché il `redirect_uri`
-> OAuth è registrato su `fontanelle.pages.dev`.
+> ⚠️ Il deploy va fatto su `fontanelle.pages.dev` e non altrove: il
+> `redirect_uri` OAuth di OpenStreetMap è registrato su quel dominio, quindi su
+> qualsiasi altro host il login OSM non funziona.
 
 ## Contribuire ai dati
 
