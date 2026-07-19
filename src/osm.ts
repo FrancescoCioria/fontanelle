@@ -219,7 +219,8 @@ export const osmGetNode = async (node: OpenStreetMapNode) => {
     `https://www.openstreetmap.org/api/0.6/${type}/${node.id}.json`
   ).then(res => res.json());
 
-  // the OSM API returns raw tags (e.g. `leisure=playground`) and no center for
+  // the OSM API returns raw tags (e.g. `leisure=playground`, `tourism=picnic_site`)
+  // and no center for
   // ways/relations — normalize before caching, or we poison the cache
   const normalized = normalizeElement(fetchedNode);
   if (normalized) {

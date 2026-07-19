@@ -41,7 +41,8 @@ export const useAppStore = create<AppState>(set => ({
     bicycle_repair_station: true,
     public_bath: true,
     device_charging_station: true,
-    playground: true
+    playground: true,
+    picnic: true
   },
   showRadius: true,
   continousSearch: false,

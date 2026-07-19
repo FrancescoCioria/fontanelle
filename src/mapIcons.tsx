@@ -6,6 +6,7 @@ import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
+import PicnicMarker from "./PicnicMarker";
 import {
   Amenity,
   AmenityTags,
@@ -81,6 +82,16 @@ export async function registerMapIcons(map: mapboxgl.Map): Promise<void> {
       renderIcon(<PublicToiletsMarker size={ICON_SIZE} color={color} />)
     ]);
     svgEntries.push([
+      `toilets-baby-${color}`,
+      renderIcon(
+        <PublicToiletsMarker size={ICON_SIZE} color={color} changingTable />
+      )
+    ]);
+    svgEntries.push([
+      `picnic-${color}`,
+      renderIcon(<PicnicMarker size={ICON_SIZE} color={color} />)
+    ]);
+    svgEntries.push([
       `shower-${color}`,
       renderIcon(<PublicShowerMarker size={ICON_SIZE} color={color} />)
     ]);
@@ -109,9 +120,12 @@ export function getIconName(tags: AmenityTags): string {
     case "device_charging_station":
       return tags.amenity;
     case "toilets":
+      // a changing table gets its own sprite rather than a second layer
+      return `toilets${tags.changing_table === "yes" ? "-baby" : ""}-${getAmenityColor(tags)}`;
     case "shower":
     case "public_bath":
     case "playground":
+    case "picnic":
       return `${tags.amenity}-${getAmenityColor(tags)}`;
   }
 }

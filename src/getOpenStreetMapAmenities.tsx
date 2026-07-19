@@ -8,6 +8,7 @@ import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
+import PicnicMarker from "./PicnicMarker";
 import OpeningHours from "opening_hours";
 
 import "localforage-getitems";
@@ -73,7 +74,40 @@ export type AmenityTags = { mapillary?: string } & (
       lit?: "yes" | "no";
       indoor?: "yes" | "no";
     }
+  // `leisure=picnic_table` (one table) and `tourism=picnic_site` (the area
+  // around them), normalized together — see `PSEUDO_AMENITIES`
+  | {
+      amenity: "picnic";
+      name?: string;
+      access?: "yes" | "public" | "permissive" | "unknown" | "private";
+      fee?: "yes" | "no" | "unknown";
+      charge?: string;
+      opening_hours?: string;
+      covered?: "yes" | "no";
+      backrest?: "yes" | "no";
+      wheelchair?: "yes" | "no" | "unknown" | "limited";
+      indoor?: "yes" | "no";
+    }
 );
+
+/**
+ * Amenities OSM files under a key other than `amenity`. One table drives both
+ * the Overpass query and the parsing, so the two can't drift apart.
+ * ⚠️ Must be declared before `editableAmenities`, which reads it at module load.
+ */
+const PSEUDO_AMENITIES: {
+  key: string;
+  value: string;
+  amenity: Amenity;
+}[] = [
+  { key: "leisure", value: "playground", amenity: "playground" },
+  // a picnic site is the area, a picnic table the furniture in it — the same
+  // place to someone looking for somewhere to eat outdoors
+  { key: "leisure", value: "picnic_table", amenity: "picnic" },
+  { key: "tourism", value: "picnic_site", amenity: "picnic" }
+];
+
+const PSEUDO_AMENITY_NAMES: Amenity[] = PSEUDO_AMENITIES.map(p => p.amenity);
 
 /**
  * Despite the name, this can also be a way or a relation (playgrounds are
@@ -93,10 +127,12 @@ export const nodeKey = (node: OpenStreetMapNode): string =>
   `${node.elementType || "node"}/${node.id}`;
 
 /**
- * Playgrounds are read-only: they live under `leisure=playground`, which the
- * OSM write path (`osm.ts`) doesn't know how to serialize back.
+ * Pseudo-amenities are read-only: they live under a key other than `amenity`
+ * (`leisure`, `tourism`), which the OSM write path (`osm.ts`) can't serialize
+ * back — it would write `amenity=playground`, which means nothing in OSM.
  */
-const isEditableAmenity = (amenity: Amenity) => amenity !== "playground";
+const isEditableAmenity = (amenity: Amenity) =>
+  !PSEUDO_AMENITY_NAMES.includes(amenity);
 
 /** Only plain nodes we know how to tag back can be created/edited/deleted. */
 export const isEditable = (node: OpenStreetMapNode): boolean =>
@@ -110,7 +146,8 @@ const amenitiesMap: { [k in Amenity]: Amenity } = {
   public_bath: "public_bath",
   bicycle_repair_station: "bicycle_repair_station",
   device_charging_station: "device_charging_station",
-  playground: "playground"
+  playground: "playground",
+  picnic: "picnic"
 };
 
 export const amenities = Object.values(amenitiesMap);
@@ -139,7 +176,14 @@ localforage.removeItem("amenities");
  * node inside it, and a park may carry one node per slide — but two fountains
  * 20m apart genuinely are two fountains.
  */
-const MERGE_RADIUS_METERS: { [k in Amenity]?: number } = { playground: 50 };
+const MERGE_RADIUS_METERS: { [k in Amenity]?: number } = {
+  playground: 50,
+  // 164 of 195 picnic objects around Milan have a neighbour within 20m — they
+  // are rows of tables in one area. Merging takes 195 pins down to ~71 places.
+  // The 10m→30m curve is flat, so 20m catches "same spot" without chaining
+  // across a whole park.
+  picnic: 20
+};
 
 /** The richest object wins: an area outranks a node, then most tags, then id. */
 const pickRepresentative = (group: OpenStreetMapNode[]): OpenStreetMapNode => {
@@ -295,6 +339,9 @@ const fetchWithRetry = async (
 
 let currentRequest: AbortController | null = null;
 
+const isKnownAmenity = (value?: string): value is Amenity =>
+  !!value && (amenities as string[]).includes(value);
+
 /** Overpass element as returned by `out center` (ways/relations have no lat/lon). */
 export type OverpassElement = {
   type: "node" | "way" | "relation";
@@ -313,16 +360,29 @@ export const normalizeElement = (
 
   if (!element.tags || lat === undefined || lon === undefined) return null;
 
-  // ⚠️ Only rewrite `leisure` on actual playgrounds. Tags we drop here are also
-  // dropped on save (osmUpdateNode replaces the whole tag set), so stripping
-  // `leisure` unconditionally would delete e.g. `leisure=sauna` from a
-  // `amenity=public_bath` node the user merely edits the fee of.
-  const { leisure, ...rest } = element.tags;
-  const tags = (
-    leisure === "playground" ? { ...rest, amenity: "playground" } : element.tags
-  ) as AmenityTags;
+  // An `amenity` we support always wins; the pseudo key is the fallback.
+  // ⚠️ NOT `!element.tags.amenity`: a playground can carry an unrelated amenity
+  // (real case, way/583656299: `leisure=playground` + `amenity=traffic_park`),
+  // and keeping the foreign value makes it vanish downstream — and get cached
+  // that way. Conversely an `amenity=toilets` that also has a picnic table
+  // stays a toilet.
+  const pseudo = isKnownAmenity(element.tags.amenity)
+    ? undefined
+    : PSEUDO_AMENITIES.find(p => element.tags![p.key] === p.value);
 
-  if (!tags.amenity) return null;
+  // ⚠️ Rewrite ONLY the key that actually matched. Tags dropped here are also
+  // dropped on save (osmUpdateNode replaces the whole tag set), so stripping
+  // `leisure` unconditionally would delete e.g. `leisure=sauna` from an
+  // `amenity=public_bath` node the user merely edits the fee of.
+  let tags = element.tags as AmenityTags;
+
+  if (pseudo) {
+    const { [pseudo.key]: _matched, ...rest } = element.tags;
+    tags = { ...rest, amenity: pseudo.amenity } as AmenityTags;
+  }
+
+  // never cache something we can't render: it would sit in IndexedDB forever
+  if (!isKnownAmenity(tags.amenity)) return null;
 
   return { id: element.id, lat, lon, elementType: element.type, tags };
 };
@@ -336,7 +396,19 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   currentRequest = controller;
 
   const around = `(around:${options.around},${options.lat},${options.lng})`;
-  const osmAmenities = amenities.filter(a => a !== "playground");
+
+  const osmAmenities = amenities.filter(
+    a => !PSEUDO_AMENITY_NAMES.includes(a)
+  );
+
+  // one branch per non-`amenity` key, values anchored so `picnic_table` can't
+  // also match e.g. `picnic_table_covered`
+  const pseudoBranches = [...new Set(PSEUDO_AMENITIES.map(p => p.key))].map(
+    key =>
+      `nwr["${key}"~"^(${PSEUDO_AMENITIES.filter(p => p.key === key)
+        .map(p => p.value)
+        .join("|")})$"]${around};`
+  );
 
   // `out center` gives areas (most playgrounds are ways/relations) a single
   // representative point instead of their full geometry
@@ -344,7 +416,7 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
     [out:json];
     (
       nwr["amenity"~"^(${osmAmenities.join("|")})$"]${around};
-      nwr["leisure"="playground"]${around};
+      ${pseudoBranches.join("\n      ")}
     );
     out center;
   `;
@@ -417,7 +489,13 @@ export const getAmenityMarker = (
     case "drinking_water":
       return <DrinkingWaterMarker size={size} />;
     case "toilets":
-      return <PublicToiletsMarker size={size} color={color} />;
+      return (
+        <PublicToiletsMarker
+          size={size}
+          color={color}
+          changingTable={amenityTags.changing_table === "yes"}
+        />
+      );
     case "shower":
       return <PublicShowerMarker size={size} color={color} />;
     case "bicycle_repair_station":
@@ -428,6 +506,8 @@ export const getAmenityMarker = (
       return <DeviceChargingStationMarker size={size} />;
     case "playground":
       return <PlaygroundMarker size={size} color={color} />;
+    case "picnic":
+      return <PicnicMarker size={size} color={color} />;
   }
 };
 
@@ -447,5 +527,7 @@ export const getAmenityTitle = (amenity: Amenity): string => {
       return "Phone Charging Station";
     case "playground":
       return "Playground";
+    case "picnic":
+      return "Picnic Area";
   }
 };
