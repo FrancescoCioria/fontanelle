@@ -23,6 +23,15 @@ export const markerLayerId = (amenity: Amenity) => `amenities-${amenity}-marker`
 /** At and below this zoom, nearby amenities collapse into a numbered bubble. */
 export const CLUSTER_MAX_ZOOM = 14;
 
+/**
+ * How far apart (in screen px) two points can be and still merge. Drives how
+ * far a bubble can drift from what it represents: the centroid sits among its
+ * members, so a wide radius parks it between them, in a different block than
+ * anything it stands for. Measured around Turro at z13: 50px gave a median
+ * drift of 108m and a worst case of 243m.
+ */
+export const CLUSTER_RADIUS = 30;
+
 /** A cluster wears its amenity's plain icon — status varies within the group. */
 export const getClusterIconName = (amenity: Amenity): string =>
   getIconName({ amenity } as AmenityTags);

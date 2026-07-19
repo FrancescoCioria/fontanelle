@@ -28,7 +28,8 @@ import {
   sourceId,
   clusterLayerId,
   markerLayerId,
-  CLUSTER_MAX_ZOOM
+  CLUSTER_MAX_ZOOM,
+  CLUSTER_RADIUS
 } from "./mapIcons";
 import Toast from "./Toast";
 import { useAppStore } from "./store";
@@ -388,7 +389,7 @@ function MapFountains() {
           data: { type: "FeatureCollection", features: [] },
           cluster: true,
           clusterMaxZoom: CLUSTER_MAX_ZOOM,
-          clusterRadius: 50
+          clusterRadius: CLUSTER_RADIUS
         });
 
         map.addLayer({
