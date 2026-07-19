@@ -1,5 +1,6 @@
 import * as localforage from "localforage";
 import uniqBy from "lodash/uniqBy";
+import distance from "@turf/distance";
 import DrinkingWaterMarker from "./DrinkingWaterMarker";
 import PublicToiletsMarker from "./PublicToiletsMarker";
 import PublicShowerMarker from "./PublicShowerMarker";
@@ -131,6 +132,95 @@ export type Options = {
 export const CACHE_KEY = "amenities-v2";
 
 localforage.removeItem("amenities");
+
+/**
+ * Amenities where several objects a few metres apart are really one place.
+ * Per-amenity on purpose: OSM often maps a playground as both an area and a
+ * node inside it, and a park may carry one node per slide — but two fountains
+ * 20m apart genuinely are two fountains.
+ */
+const MERGE_RADIUS_METERS: { [k in Amenity]?: number } = { playground: 50 };
+
+/** The richest object wins: an area outranks a node, then most tags, then id. */
+const pickRepresentative = (group: OpenStreetMapNode[]): OpenStreetMapNode => {
+  const isArea = (n: OpenStreetMapNode) =>
+    (n.elementType || "node") === "node" ? 0 : 1;
+
+  return [...group].sort(
+    (a, b) =>
+      isArea(b) - isArea(a) ||
+      Object.keys(b.tags).length - Object.keys(a.tags).length ||
+      a.id - b.id
+  )[0];
+};
+
+/**
+ * Collapses each cluster of near-duplicate objects into its representative,
+ * moved to the group's midpoint. Single-linkage, so a row of swings spanning
+ * one park collapses into one marker rather than a chain of them.
+ */
+export const mergeNearbyNodes = (
+  nodes: OpenStreetMapNode[]
+): OpenStreetMapNode[] => {
+  const result: OpenStreetMapNode[] = [];
+  const mergeable: { [k: string]: OpenStreetMapNode[] } = Object.create(null);
+
+  nodes.forEach(node => {
+    const amenity = node.tags.amenity;
+
+    if (MERGE_RADIUS_METERS[amenity]) {
+      mergeable[amenity] = (mergeable[amenity] || []).concat(node);
+    } else {
+      result.push(node);
+    }
+  });
+
+  Object.keys(mergeable).forEach(amenity => {
+    const group = mergeable[amenity];
+    const radius = MERGE_RADIUS_METERS[amenity as Amenity]!;
+    const taken = new Set<number>();
+
+    group.forEach((node, i) => {
+      if (taken.has(i)) return;
+
+      taken.add(i);
+      const members = [i];
+
+      // walk the chain: anything near an already-collected member joins too
+      for (let k = 0; k < members.length; k++) {
+        const from = group[members[k]];
+
+        group.forEach((other, j) => {
+          if (taken.has(j)) return;
+
+          const meters = distance([from.lon, from.lat], [other.lon, other.lat], {
+            units: "meters"
+          });
+
+          if (meters <= radius) {
+            taken.add(j);
+            members.push(j);
+          }
+        });
+      }
+
+      if (members.length === 1) {
+        result.push(node);
+        return;
+      }
+
+      const nodes = members.map(idx => group[idx]);
+
+      result.push({
+        ...pickRepresentative(nodes),
+        lat: nodes.reduce((s, n) => s + n.lat, 0) / nodes.length,
+        lon: nodes.reduce((s, n) => s + n.lon, 0) / nodes.length
+      });
+    });
+  });
+
+  return result;
+};
 
 export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
   const cachedItems =

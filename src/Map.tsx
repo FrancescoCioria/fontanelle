@@ -8,6 +8,7 @@ import getOpenStreetMapAmenities, {
   getAmenityIcon,
   amenities,
   editableAmenities,
+  mergeNearbyNodes,
   nodeKey,
   CACHE_KEY
 } from "./getOpenStreetMapAmenities";
@@ -23,10 +24,10 @@ import BottomSheet from "./BottomSheet";
 import {
   registerMapIcons,
   getIconName,
-  AMENITIES_SOURCE,
-  AMENITIES_LAYER,
-  CLUSTERS_LAYER,
-  CLUSTER_COUNT_LAYER,
+  getClusterIconName,
+  sourceId,
+  clusterLayerId,
+  markerLayerId,
   CLUSTER_MAX_ZOOM
 } from "./mapIcons";
 import Toast from "./Toast";
@@ -80,6 +81,7 @@ function MapFountains() {
     lat: 0
   });
   const loadingBarRef = useRef<LoadingBarRef>(null);
+  const lastSourceDataRef = useRef<{ [k: string]: string }>({});
 
   // Mirror state in refs so callbacks/event-handlers always read fresh values
   const aroundRef = useRef(around);
@@ -103,33 +105,52 @@ function MapFountains() {
 
   function updateGeoJsonSource() {
     getMap(map => {
-      const source = map.getSource(AMENITIES_SOURCE) as
-        | mapboxgl.GeoJSONSource
-        | undefined;
-      if (!source) return;
+      // null-prototype: an amenity read back from a stale cache entry could
+      // otherwise be "toString" and inherit a truthy value from Object.prototype
+      const byAmenity: { [k: string]: GeoJSON.Feature[] } = Object.create(null);
+      amenities.forEach(amenity => (byAmenity[amenity] = []));
 
       // ⚠️ Amenity filtering happens here, not via `map.setFilter`: Mapbox
       // builds clusters from the source data, so a layer filter would hide
       // markers while still counting them in the cluster bubbles.
-      const features: GeoJSON.Feature[] = Object.values(nodesRef.current)
-        .filter(node => filtersRef.current[node.tags.amenity])
-        .map(node => ({
-          type: "Feature" as const,
+      mergeNearbyNodes(Object.values(nodesRef.current)).forEach(node => {
+        const amenity = node.tags.amenity;
+        if (!byAmenity[amenity] || !filtersRef.current[amenity]) return;
+
+        byAmenity[amenity].push({
+          type: "Feature",
           geometry: {
-            type: "Point" as const,
+            type: "Point",
             coordinates: [node.lon, node.lat]
           },
           properties: {
             key: nodeKey(node),
-            amenity: node.tags.amenity,
-            icon: getIconName(node.tags),
-            sortOrder: amenitiesMapOrder[node.tags.amenity]
+            amenity,
+            icon: getIconName(node.tags)
           }
-        }));
+        });
+      });
 
-      source.setData({
-        type: "FeatureCollection",
-        features
+      amenities.forEach(amenity => {
+        const source = map.getSource(sourceId(amenity)) as
+          | mapboxgl.GeoJSONSource
+          | undefined;
+        if (!source) return;
+
+        const data: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features: byAmenity[amenity]
+        };
+
+        // ⚠️ Skip unchanged sources. setData rebuilds that source's supercluster
+        // index and invalidates its cluster ids, which races the tap handler's
+        // getClusterExpansionZoom — no reason to do that to 6 untouched sources
+        // every time one filter pill is toggled.
+        const serialized = JSON.stringify(data);
+        if (lastSourceDataRef.current[amenity] === serialized) return;
+
+        lastSourceDataRef.current[amenity] = serialized;
+        source.setData(data);
       });
     });
   }
@@ -349,71 +370,88 @@ function MapFountains() {
     map.addControl(new mapboxgl.ScaleControl());
 
     map.on("load", async () => {
-      mapRef.current = map;
-
+      // ⚠️ mapRef is published only after the sources exist (below). Setting it
+      // here would let updateGeoJsonSource run during the await and no-op on
+      // missing sources, losing markers until the next pan.
       await registerMapIcons(map);
 
-      map.addSource(AMENITIES_SOURCE, {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-        cluster: true,
-        clusterMaxZoom: CLUSTER_MAX_ZOOM,
-        clusterRadius: 50
+      // Least-important first: later layers draw on top, which reproduces the
+      // old symbol-sort-key priority (drinking water above everything).
+      const byPriority = [...amenities].sort(
+        (a, b) => amenitiesMapOrder[b] - amenitiesMapOrder[a]
+      );
+
+      byPriority.forEach(amenity => {
+        map.addSource(sourceId(amenity), {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+          cluster: true,
+          clusterMaxZoom: CLUSTER_MAX_ZOOM,
+          clusterRadius: 50
+        });
+
+        map.addLayer({
+          id: clusterLayerId(amenity),
+          type: "symbol",
+          source: sourceId(amenity),
+          filter: ["has", "point_count"],
+          layout: {
+            // the amenity's own icon, so a cluster still says WHAT it groups
+            "icon-image": getClusterIconName(amenity),
+            "icon-size": ["step", ["get", "point_count"], 1, 10, 1.2, 50, 1.4],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            // count as a badge off the icon's corner. ⚠️ text-offset is in ems
+            // of text-size, so it has to step in lockstep with icon-size or the
+            // badge drifts onto the icon body on bigger clusters.
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+            "text-size": 13,
+            "text-anchor": "left",
+            "text-offset": [
+              "step",
+              ["get", "point_count"],
+              ["literal", [0.75, 0.7]],
+              10,
+              ["literal", [0.95, 0.85]],
+              50,
+              ["literal", [1.1, 1]]
+            ],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true
+          },
+          paint: {
+            "text-color": "#0f172a",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 2.5
+          }
+        });
       });
 
-      map.addLayer({
-        id: CLUSTERS_LAYER,
-        type: "circle",
-        source: AMENITIES_SOURCE,
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": "#0ea5e9",
-          "circle-opacity": 0.92,
-          "circle-stroke-width": 3,
-          "circle-stroke-color": "#ffffff",
-          // grows with the count, so a big cluster reads as big at a glance
-          "circle-radius": [
-            "step",
-            ["get", "point_count"],
-            16,
-            10,
-            20,
-            50,
-            25,
-            200,
-            31
-          ]
-        }
+      // ⚠️ All markers go above ALL clusters, in a second pass. Interleaving
+      // them per-amenity would let one type's cluster paint over another type's
+      // marker, while the tap handler — which checks markers first — still
+      // resolved to the hidden marker underneath.
+      byPriority.forEach(amenity => {
+        map.addLayer({
+          id: markerLayerId(amenity),
+          type: "symbol",
+          source: sourceId(amenity),
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            "icon-image": ["get", "icon"],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true
+          }
+        });
       });
 
-      map.addLayer({
-        id: CLUSTER_COUNT_LAYER,
-        type: "symbol",
-        source: AMENITIES_SOURCE,
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": ["get", "point_count_abbreviated"],
-          "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-          "text-size": 14,
-          "text-allow-overlap": true
-        },
-        paint: { "text-color": "#ffffff" }
-      });
+      mapRef.current = map;
 
-      map.addLayer({
-        id: AMENITIES_LAYER,
-        type: "symbol",
-        source: AMENITIES_SOURCE,
-        filter: ["!", ["has", "point_count"]],
-        layout: {
-          "icon-image": ["get", "icon"],
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
-          "symbol-sort-key": ["get", "sortOrder"]
-        }
-      });
+      const markerLayers = amenities.map(markerLayerId);
+      const clusterLayers = amenities.map(clusterLayerId);
 
-      // A single handler for both layers: per-layer `map.on("click", layer)`
+      // A single handler for every layer: per-layer `map.on("click", layer)`
       // listeners fire independently, so one tap landing on an icon that
       // overlaps a cluster bubble would open the sheet AND zoom away.
       map.on("click", e => {
@@ -422,7 +460,7 @@ function MapFountains() {
         if (isPickingCoordinatesRef.current) return;
 
         const [marker] = map.queryRenderedFeatures(e.point, {
-          layers: [AMENITIES_LAYER]
+          layers: markerLayers
         });
 
         if (marker?.properties?.key) {
@@ -432,7 +470,7 @@ function MapFountains() {
         }
 
         const [cluster] = map.queryRenderedFeatures(e.point, {
-          layers: [CLUSTERS_LAYER]
+          layers: clusterLayers
         });
 
         if (!cluster) return;
@@ -441,7 +479,10 @@ function MapFountains() {
           number,
           number
         ];
-        const source = map.getSource(AMENITIES_SOURCE) as mapboxgl.GeoJSONSource;
+        // each amenity has its own source, so expand against the one it came from
+        const source = map.getSource(
+          cluster.source
+        ) as mapboxgl.GeoJSONSource;
 
         source.getClusterExpansionZoom(cluster.properties!.cluster_id, (err, zoom) => {
           // cluster ids are invalidated by every setData, so a refresh landing
@@ -451,7 +492,7 @@ function MapFountains() {
       });
 
       // Pointer cursor on hover
-      [AMENITIES_LAYER, CLUSTERS_LAYER].forEach(layer => {
+      [...markerLayers, ...clusterLayers].forEach(layer => {
         map.on("mouseenter", layer, () => {
           map.getCanvas().style.cursor = "pointer";
         });

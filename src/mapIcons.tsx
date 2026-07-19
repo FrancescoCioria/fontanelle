@@ -6,15 +6,25 @@ import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
-import { AmenityTags, getAmenityColor } from "./getOpenStreetMapAmenities";
+import {
+  Amenity,
+  AmenityTags,
+  getAmenityColor
+} from "./getOpenStreetMapAmenities";
 
-export const AMENITIES_SOURCE = "amenities-source";
-export const AMENITIES_LAYER = "amenities-layer";
-export const CLUSTERS_LAYER = "amenities-clusters-layer";
-export const CLUSTER_COUNT_LAYER = "amenities-cluster-count-layer";
+// One source per amenity, because Mapbox clusters per source: a single shared
+// source would merge a fountain and a playground into one anonymous bubble.
+// Keeping them apart is what lets a cluster stay recognizable as "6 fountains".
+export const sourceId = (amenity: Amenity) => `amenities-${amenity}-source`;
+export const clusterLayerId = (amenity: Amenity) => `amenities-${amenity}-cluster`;
+export const markerLayerId = (amenity: Amenity) => `amenities-${amenity}-marker`;
 
 /** At and below this zoom, nearby amenities collapse into a numbered bubble. */
 export const CLUSTER_MAX_ZOOM = 14;
+
+/** A cluster wears its amenity's plain icon — status varies within the group. */
+export const getClusterIconName = (amenity: Amenity): string =>
+  getIconName({ amenity } as AmenityTags);
 
 const ICON_SIZE = 48;
 const COLORS = ["white", "gold", "#d0d0d0"];
