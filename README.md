@@ -1,19 +1,59 @@
-# See live
+# Fontanelle
 
-### `yarn start`
+Mappa delle risorse pubbliche all'aperto, basata su OpenStreetMap: fontanelle,
+bagni pubblici, docce, bagni pubblici storici, stazioni di riparazione bici,
+punti di ricarica, parchi giochi e aree picnic.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Il nome è storico — è nata per le sole fontanelle, oggi copre l'outdoor in
+generale, con un occhio a chi gira con bambini (parchi giochi, aree picnic,
+bagni col fasciatoio).
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+**Live: https://fontanelle.pages.dev**
 
-### `yarn build`
+È una PWA: si installa sul telefono e i dati già scaricati restano consultabili
+offline.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Sviluppo
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+yarn install
+yarn start      # dev server su http://localhost:5173
+yarn build      # build di produzione in dist/
+yarn preview    # serve la build di produzione in locale
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Serve un token Mapbox in un file `.env` (non versionato):
+
+```
+VITE_MAPBOX_TOKEN=pk.xxxxx
+```
+
+## Deploy
+
+Cloudflare Pages:
+
+```bash
+npx wrangler pages deploy dist --project-name fontanelle
+```
+
+Il token Mapbox è anche un secret di Cloudflare Pages (`VITE_MAPBOX_TOKEN`).
+
+> ⚠️ Lo script `yarn deploy` in `package.json` è obsoleto: punta a GitHub Pages
+> (`gh-pages`), non a Cloudflare. Non usarlo — oltre a pubblicare nel posto
+> sbagliato, il login OpenStreetMap non funzionerebbe, perché il `redirect_uri`
+> OAuth è registrato su `fontanelle.pages.dev`.
+
+## Contribuire ai dati
+
+I dati vengono da OpenStreetMap, quindi non c'è un database da correggere: si
+modifica OSM. Con un account OSM si possono aggiungere e modificare i punti
+direttamente dall'app, e la modifica finisce su OSM per tutti.
+
+I parchi giochi e le aree picnic sono in sola lettura nell'app, perché OSM li
+cataloga sotto chiavi (`leisure`, `tourism`) che la parte di scrittura non sa
+ancora gestire.
+
+## Note tecniche
+
+Dettagli di architettura, vincoli e trappole note sono in
+[CLAUDE.md](./CLAUDE.md).

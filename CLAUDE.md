@@ -13,11 +13,15 @@ Uses Vite with `vite-plugin-pwa` for service worker generation and `vite-plugin-
 
 ## Deployment
 
-Hosted on **Cloudflare Pages** at https://fontanelle.pages.dev. The Mapbox token is stored as a Cloudflare Pages secret (`VITE_MAPBOX_TOKEN`) and locally in `.env` (gitignored). Build with the env var: `VITE_MAPBOX_TOKEN=... yarn build`.
+Hosted on **Cloudflare Pages** at https://fontanelle.pages.dev.
+
+⚠️ `yarn deploy` in `package.json` is stale — it runs `gh-pages -d dist` and publishes to GitHub Pages (`homepage` still points at `francescocioria.github.io/fontanelle`). Deploy with the wrangler command below instead; the gh-pages target would also break OSM login, since the OAuth `redirect_uri` is registered on `fontanelle.pages.dev`. The Mapbox token is stored as a Cloudflare Pages secret (`VITE_MAPBOX_TOKEN`) and locally in `.env` (gitignored). Build with the env var: `VITE_MAPBOX_TOKEN=... yarn build`.
 
 ## Architecture
 
-This is a React 18 + TypeScript 5 PWA that displays public amenities (drinking water, toilets, showers, bicycle repair stations, public baths, device charging stations, playgrounds) on a Mapbox map using OpenStreetMap data.
+This is a React 18 + TypeScript 5 PWA that displays public amenities (drinking water, toilets, showers, bicycle repair stations, public baths, device charging stations, playgrounds, picnic areas) on a Mapbox map using OpenStreetMap data.
+
+Scope note: "fontanelle" is a legacy name — the app is about outdoor amenities generally, increasingly with kids in mind. ⚠️ Renaming is not free: the OSM OAuth `redirect_uri` is hardcoded in `osm.ts` to `https://fontanelle.pages.dev/` and must match the registered OSM app, so changing the *domain* breaks login until both are updated.
 
 ### Data Flow
 
