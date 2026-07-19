@@ -5,6 +5,7 @@ import PublicShowerMarker from "./PublicShowerMarker";
 import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
+import PlaygroundMarker from "./PlaygroundMarker";
 import { AmenityTags, getAmenityColor } from "./getOpenStreetMapAmenities";
 
 export const AMENITIES_SOURCE = "amenities-source";
@@ -72,6 +73,10 @@ export async function registerMapIcons(map: mapboxgl.Map): Promise<void> {
       `public_bath-${color}`,
       renderIcon(<PublicBathMarker size={ICON_SIZE} color={color} />)
     ]);
+    svgEntries.push([
+      `playground-${color}`,
+      renderIcon(<PlaygroundMarker size={ICON_SIZE} color={color} />)
+    ]);
   }
 
   await Promise.all(
@@ -91,6 +96,7 @@ export function getIconName(tags: AmenityTags): string {
     case "toilets":
     case "shower":
     case "public_bath":
+    case "playground":
       return `${tags.amenity}-${getAmenityColor(tags)}`;
   }
 }

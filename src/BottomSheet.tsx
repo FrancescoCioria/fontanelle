@@ -3,6 +3,7 @@ import { Drawer } from "vaul";
 import {
   getAmenityMarker,
   getAmenityTitle,
+  isEditable,
   OpenStreetMapNode
 } from "./getOpenStreetMapAmenities";
 import { Button } from "./form";
@@ -188,14 +189,16 @@ export default () => {
                 />
               )}
 
-              <Button
-                style={{ flex: 1 }}
-                label="Edit"
-                onClick={() => {
-                  setUpsertNode({ type: "update", node });
-                  setOpenedNode(null);
-                }}
-              />
+              {isEditable(node) && (
+                <Button
+                  style={{ flex: 1 }}
+                  label="Edit"
+                  onClick={() => {
+                    setUpsertNode({ type: "update", node });
+                    setOpenedNode(null);
+                  }}
+                />
+              )}
             </div>
 
             {fetchedNode ? (

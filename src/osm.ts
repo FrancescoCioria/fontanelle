@@ -1,4 +1,5 @@
 import {
+  normalizeElement,
   OpenStreetMapNode,
   updateCachedItems
 } from "./getOpenStreetMapAmenities";
@@ -210,13 +211,20 @@ export const osmCreateNode = async (
 };
 
 export const osmGetNode = async (node: OpenStreetMapNode) => {
+  const type = node.elementType || "node";
+
   const {
     elements: [fetchedNode]
   } = await fetch(
-    `https://www.openstreetmap.org/api/0.6/node/${node.id}.json`
+    `https://www.openstreetmap.org/api/0.6/${type}/${node.id}.json`
   ).then(res => res.json());
 
-  updateCachedItems([fetchedNode]);
+  // the OSM API returns raw tags (e.g. `leisure=playground`) and no center for
+  // ways/relations — normalize before caching, or we poison the cache
+  const normalized = normalizeElement(fetchedNode);
+  if (normalized) {
+    updateCachedItems([normalized]);
+  }
 
   return fetchedNode;
 };

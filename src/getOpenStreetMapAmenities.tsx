@@ -6,6 +6,7 @@ import PublicShowerMarker from "./PublicShowerMarker";
 import BicycleRepairStationMarker from "./BicycleRepairStationMarker";
 import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
+import PlaygroundMarker from "./PlaygroundMarker";
 import OpeningHours from "opening_hours";
 
 import "localforage-getitems";
@@ -53,14 +54,53 @@ export type AmenityTags = { mapillary?: string } & (
       amenity: "device_charging_station";
       indoor?: "yes" | "no";
     }
+  // OSM tags playgrounds as `leisure=playground`, not `amenity=*`.
+  // We normalize them into this pseudo-amenity when parsing the Overpass
+  // response — see `normalizeElement`.
+  | {
+      amenity: "playground";
+      name?: string;
+      access?: "yes" | "public" | "permissive" | "unknown" | "private";
+      fee?: "yes" | "no" | "unknown";
+      charge?: string;
+      opening_hours?: string;
+      min_age?: string;
+      max_age?: string;
+      surface?: string;
+      wheelchair?: "yes" | "no" | "unknown" | "limited";
+      fenced?: "yes" | "no";
+      lit?: "yes" | "no";
+      indoor?: "yes" | "no";
+    }
 );
 
+/**
+ * Despite the name, this can also be a way or a relation (playgrounds are
+ * usually mapped as areas). `lat`/`lon` are then the geometric center, and
+ * the element is read-only — see `isEditable`.
+ */
 export type OpenStreetMapNode = {
   id: number;
   lat: number;
   lon: number;
   tags: AmenityTags;
+  elementType?: "node" | "way" | "relation";
 };
+
+/** Unique across element types: way/123 and node/123 are different objects. */
+export const nodeKey = (node: OpenStreetMapNode): string =>
+  `${node.elementType || "node"}/${node.id}`;
+
+/**
+ * Playgrounds are read-only: they live under `leisure=playground`, which the
+ * OSM write path (`osm.ts`) doesn't know how to serialize back.
+ */
+const isEditableAmenity = (amenity: Amenity) => amenity !== "playground";
+
+/** Only plain nodes we know how to tag back can be created/edited/deleted. */
+export const isEditable = (node: OpenStreetMapNode): boolean =>
+  (node.elementType || "node") === "node" &&
+  isEditableAmenity(node.tags.amenity);
 
 const amenitiesMap: { [k in Amenity]: Amenity } = {
   drinking_water: "drinking_water",
@@ -68,10 +108,14 @@ const amenitiesMap: { [k in Amenity]: Amenity } = {
   toilets: "toilets",
   public_bath: "public_bath",
   bicycle_repair_station: "bicycle_repair_station",
-  device_charging_station: "device_charging_station"
+  device_charging_station: "device_charging_station",
+  playground: "playground"
 };
 
 export const amenities = Object.values(amenitiesMap);
+
+/** Amenities the user can add from the app. */
+export const editableAmenities = amenities.filter(isEditableAmenity);
 
 export type Amenity = AmenityTags["amenity"];
 
@@ -81,20 +125,29 @@ export type Options = {
   lng: number;
 };
 
+// Bumped when the cached shape changes: v1 entries predate `elementType`, so
+// the same way would be stored twice (as `node/42` and `way/42`) and the stale
+// copy — which has no coordinates — could never be evicted.
+export const CACHE_KEY = "amenities-v2";
+
+localforage.removeItem("amenities");
+
 export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
   const cachedItems =
-    (await localforage.getItem<OpenStreetMapNode[]>("amenities")) || [];
+    (await localforage.getItem<OpenStreetMapNode[]>(CACHE_KEY)) || [];
 
-  const nodes = uniqBy(newNodes.concat(cachedItems), i => i.id);
+  const nodes = uniqBy(newNodes.concat(cachedItems), nodeKey);
 
   // fire&forget
-  localforage.setItem("amenities", nodes);
+  localforage.setItem(CACHE_KEY, nodes);
 };
 
+// ⚠️ Only world-wide instances. overpass.osm.ch was removed 2026-07-19: it only
+// serves Switzerland, so failing over to it returned `200 []` for Milan — an
+// empty map with no error.
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
-  "https://overpass.osm.ch/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter"
 ];
@@ -123,7 +176,7 @@ const fetchWithRetry = async (
       const combinedSignal = signal
         ? AbortSignal.any([signal, timeout])
         : timeout;
-      const res = await fetch(`${endpoint}?data=${query}&output`, {
+      const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
         signal: combinedSignal
       });
 
@@ -152,6 +205,38 @@ const fetchWithRetry = async (
 
 let currentRequest: AbortController | null = null;
 
+/** Overpass element as returned by `out center` (ways/relations have no lat/lon). */
+export type OverpassElement = {
+  type: "node" | "way" | "relation";
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: { [k: string]: string };
+};
+
+export const normalizeElement = (
+  element: OverpassElement
+): OpenStreetMapNode | null => {
+  const lat = element.lat ?? element.center?.lat;
+  const lon = element.lon ?? element.center?.lon;
+
+  if (!element.tags || lat === undefined || lon === undefined) return null;
+
+  // ⚠️ Only rewrite `leisure` on actual playgrounds. Tags we drop here are also
+  // dropped on save (osmUpdateNode replaces the whole tag set), so stripping
+  // `leisure` unconditionally would delete e.g. `leisure=sauna` from a
+  // `amenity=public_bath` node the user merely edits the fee of.
+  const { leisure, ...rest } = element.tags;
+  const tags = (
+    leisure === "playground" ? { ...rest, amenity: "playground" } : element.tags
+  ) as AmenityTags;
+
+  if (!tags.amenity) return null;
+
+  return { id: element.id, lat, lon, elementType: element.type, tags };
+};
+
 export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   if (currentRequest) {
     currentRequest.abort();
@@ -160,22 +245,32 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   const controller = new AbortController();
   currentRequest = controller;
 
+  const around = `(around:${options.around},${options.lat},${options.lng})`;
+  const osmAmenities = amenities.filter(a => a !== "playground");
+
+  // `out center` gives areas (most playgrounds are ways/relations) a single
+  // representative point instead of their full geometry
   const query = `
     [out:json];
-    (nwr["amenity"~"${amenities.join("|")}"](around:${
-    options.around
-  },${options.lat},${options.lng}););
-    out;>;out;
+    (
+      nwr["amenity"~"^(${osmAmenities.join("|")})$"]${around};
+      nwr["leisure"="playground"]${around};
+    );
+    out center;
   `;
 
   try {
     const res = await fetchWithRetry(query, controller.signal, options.around);
 
-    const json: { elements: OpenStreetMapNode[] } = await res.json();
+    const json: { elements: OverpassElement[] } = await res.json();
 
-    updateCachedItems(json.elements);
+    const nodes = json.elements
+      .map(normalizeElement)
+      .filter((n): n is OpenStreetMapNode => n !== null);
 
-    return json.elements.filter(v => v.tags);
+    updateCachedItems(nodes);
+
+    return nodes;
   } finally {
     if (currentRequest === controller) {
       currentRequest = null;
@@ -241,6 +336,8 @@ export const getAmenityMarker = (
       return <PublicBathMarker size={size} color={color} />;
     case "device_charging_station":
       return <DeviceChargingStationMarker size={size} />;
+    case "playground":
+      return <PlaygroundMarker size={size} color={color} />;
   }
 };
 
@@ -258,5 +355,7 @@ export const getAmenityTitle = (amenity: Amenity): string => {
       return "Public Bath";
     case "device_charging_station":
       return "Phone Charging Station";
+    case "playground":
+      return "Playground";
   }
 };

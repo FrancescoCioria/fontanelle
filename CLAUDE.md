@@ -17,22 +17,24 @@ Hosted on **Cloudflare Pages** at https://fontanelle.pages.dev. The Mapbox token
 
 ## Architecture
 
-This is a React 18 + TypeScript 5 PWA that displays public amenities (drinking water, toilets, showers, bicycle repair stations, public baths, device charging stations) on a Mapbox map using OpenStreetMap data.
+This is a React 18 + TypeScript 5 PWA that displays public amenities (drinking water, toilets, showers, bicycle repair stations, public baths, device charging stations, playgrounds) on a Mapbox map using OpenStreetMap data.
 
 ### Data Flow
 
-1. **Overpass API** (`getOpenStreetMapAmenities.tsx`) — Queries OSM Overpass API for amenities within a radius around the map center. Uses a single unified query. A pool of 5 public Overpass endpoints provides automatic failover on 429/5xx errors. Previous in-flight requests are aborted when a new one starts.
-2. **Local cache** (`localforage`) — All fetched nodes are cached in IndexedDB. On map move, cached nodes in the current radius are shown immediately while fresh data loads.
+1. **Overpass API** (`getOpenStreetMapAmenities.tsx`) — Queries OSM Overpass API for amenities within a radius around the map center. Uses a single unified query with two branches: `amenity~^(…)$` and `leisure=playground`. Ends with `out center;` so ways/relations get a representative point (most playgrounds are areas). A pool of 4 public Overpass endpoints provides automatic failover on 429/5xx errors. Previous in-flight requests are aborted when a new one starts.
+   - ⚠️ Only **world-wide** instances belong in the pool. `overpass.osm.ch` was removed 2026-07-19: it serves Switzerland only, so failing over to it returned `200 []` outside CH — an empty map with no error.
+   - `normalizeElement` folds `leisure=playground` into the pseudo-amenity `amenity: "playground"` so the rest of the app keeps discriminating on one field. ⚠️ It rewrites `leisure` **only** on actual playgrounds: `osmUpdateNode` replaces the whole tag set, so dropping a tag on read deletes it from OSM on save.
+2. **Local cache** (`localforage`, key `CACHE_KEY`) — All fetched nodes are cached in IndexedDB, keyed by `nodeKey` (`type/id` — `way/42` and `node/42` are different objects). Bump `CACHE_KEY` when the cached shape changes; v1 entries predated `elementType` and could never be evicted. On map move, cached nodes in the current radius are shown immediately while fresh data loads.
 3. **Map markers** — `Map.tsx` uses a Mapbox GeoJSON source + symbol layer. Amenity nodes are converted to GeoJSON features with pre-registered icon sprites. Filtering is done via Mapbox layer filters.
 
 ### OSM Integration (`osm.ts`)
 
-Authenticated users can create, update, and delete OSM nodes via the OSM API. Uses `osm-auth` for OAuth2 in singlepage mode (redirect-based, no popup). The OAuth app is configured as a public client (no client_secret). All mutations are wrapped in changesets. Node data is serialized to XML via `xml2js` Builder.
+Authenticated users can create, update, and delete OSM nodes via the OSM API. **Write path is node-only**: `isEditable` gates it to plain nodes with an editable amenity, and `editableAmenities` gates the add menu. Playgrounds are read-only (they live under `leisure=*`, which this path can't serialize back), as is anything mapped as a way/relation. Uses `osm-auth` for OAuth2 in singlepage mode (redirect-based, no popup). The OAuth app is configured as a public client (no client_secret). All mutations are wrapped in changesets. Node data is serialized to XML via `xml2js` Builder.
 
 ### Key Types
 
-- `OpenStreetMapNode` — Core data type: `{ id, lat, lon, tags: AmenityTags }`
-- `Amenity` — Union type: `"drinking_water" | "toilets" | "shower" | "bicycle_repair_station" | "public_bath" | "device_charging_station"`
+- `OpenStreetMapNode` — Core data type: `{ id, lat, lon, tags: AmenityTags, elementType? }`. Despite the name it may be a way/relation, in which case `lat`/`lon` are the `out center` centroid and the element is read-only.
+- `Amenity` — Union type: `"drinking_water" | "toilets" | "shower" | "bicycle_repair_station" | "public_bath" | "device_charging_station" | "playground"`
 - `AmenityTags` — Discriminated union on `amenity` field, each variant with amenity-specific optional tags
 
 ### Component Structure

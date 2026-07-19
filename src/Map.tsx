@@ -6,7 +6,10 @@ import getOpenStreetMapAmenities, {
   Amenity,
   getAmenityTitle,
   getAmenityIcon,
-  amenities
+  amenities,
+  editableAmenities,
+  nodeKey,
+  CACHE_KEY
 } from "./getOpenStreetMapAmenities";
 import distance from "@turf/distance";
 import localforage from "localforage";
@@ -36,7 +39,8 @@ const amenitiesMapOrder: { [k in Amenity]: number } = {
   toilets: 3,
   public_bath: 4,
   device_charging_station: 5,
-  bicycle_repair_station: 6
+  bicycle_repair_station: 6,
+  playground: 7
 };
 
 function MapFountains() {
@@ -105,7 +109,7 @@ function MapFountains() {
             coordinates: [node.lon, node.lat]
           },
           properties: {
-            id: node.id,
+            key: nodeKey(node),
             amenity: node.tags.amenity,
             icon: getIconName(node.tags),
             sortOrder: amenitiesMapOrder[node.tags.amenity]
@@ -143,8 +147,8 @@ function MapFountains() {
   function addAmenitiesMarkers(nodes: OpenStreetMapNode[]) {
     let changed = false;
     nodes.forEach(node => {
-      if (node.tags?.amenity && !nodesRef.current[node.id]) {
-        nodesRef.current[node.id] = node;
+      if (node.tags?.amenity && !nodesRef.current[nodeKey(node)]) {
+        nodesRef.current[nodeKey(node)] = node;
         changed = true;
       }
     });
@@ -158,7 +162,7 @@ function MapFountains() {
     getMap(map => {
       const center = map.getCenter();
 
-      localforage.getItem<OpenStreetMapNode[]>("amenities").then(items => {
+      localforage.getItem<OpenStreetMapNode[]>(CACHE_KEY).then(items => {
         if (items) {
           const nodesInRadius = items.filter(node => {
             const distanceInMeters = distance(
@@ -379,8 +383,8 @@ function MapFountains() {
       // Click handler
       map.on("click", AMENITIES_LAYER, e => {
         const feature = e.features?.[0];
-        if (feature?.properties?.id) {
-          const node = nodesRef.current[feature.properties.id];
+        if (feature?.properties?.key) {
+          const node = nodesRef.current[feature.properties.key];
           if (node) {
             setOpenedNode(node);
           }
@@ -456,7 +460,8 @@ function MapFountains() {
     shower: { label: "Showers", color: "#f97316" },
     bicycle_repair_station: { label: "Bike Repair", color: "#10b981" },
     public_bath: { label: "Baths", color: "#ec4899" },
-    device_charging_station: { label: "Charging", color: "#eab308" }
+    device_charging_station: { label: "Charging", color: "#eab308" },
+    playground: { label: "Playgrounds", color: "#f43f5e" }
   };
 
   return (
@@ -526,9 +531,9 @@ function MapFountains() {
             action: "create" | "update" | "delete"
           ) => {
             if (action === "delete") {
-              delete nodesRef.current[node.id];
+              delete nodesRef.current[nodeKey(node)];
             } else {
-              nodesRef.current[node.id] = node;
+              nodesRef.current[nodeKey(node)] = node;
               updateCachedItems([node]);
             }
 
@@ -634,7 +639,7 @@ function MapFountains() {
         <h4 style={{ marginTop: 0 }}>Add new amenity</h4>
         <span style={{ fontSize: 13, color: "#64748b" }}>OSM account required</span>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
-          {amenities.map(amenity => (
+          {editableAmenities.map(amenity => (
             <Button
               key={amenity}
               label={getAmenityTitle(amenity)}
