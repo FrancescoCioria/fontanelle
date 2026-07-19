@@ -24,7 +24,10 @@ import {
   registerMapIcons,
   getIconName,
   AMENITIES_SOURCE,
-  AMENITIES_LAYER
+  AMENITIES_LAYER,
+  CLUSTERS_LAYER,
+  CLUSTER_COUNT_LAYER,
+  CLUSTER_MAX_ZOOM
 } from "./mapIcons";
 import Toast from "./Toast";
 import { useAppStore } from "./store";
@@ -87,6 +90,10 @@ function MapFountains() {
   continousSearchRef.current = continousSearch;
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
+  const isPickingCoordinatesRef = useRef(false);
+  isPickingCoordinatesRef.current =
+    upsertNode?.type === "create_without_coordinates" ||
+    upsertNode?.type === "update_without_coordinates";
 
   // --- Helper functions (read from refs, so always up-to-date) ---
 
@@ -101,8 +108,12 @@ function MapFountains() {
         | undefined;
       if (!source) return;
 
-      const features: GeoJSON.Feature[] = Object.values(nodesRef.current).map(
-        node => ({
+      // ⚠️ Amenity filtering happens here, not via `map.setFilter`: Mapbox
+      // builds clusters from the source data, so a layer filter would hide
+      // markers while still counting them in the cluster bubbles.
+      const features: GeoJSON.Feature[] = Object.values(nodesRef.current)
+        .filter(node => filtersRef.current[node.tags.amenity])
+        .map(node => ({
           type: "Feature" as const,
           geometry: {
             type: "Point" as const,
@@ -114,33 +125,12 @@ function MapFountains() {
             icon: getIconName(node.tags),
             sortOrder: amenitiesMapOrder[node.tags.amenity]
           }
-        })
-      );
+        }));
 
       source.setData({
         type: "FeatureCollection",
         features
       });
-    });
-  }
-
-  function updateLayerFilter() {
-    getMap(map => {
-      const enabledAmenities = amenities.filter(a => filtersRef.current[a]);
-
-      if (enabledAmenities.length === amenities.length) {
-        map.setFilter(AMENITIES_LAYER, null);
-      } else if (enabledAmenities.length === 0) {
-        map.setFilter(AMENITIES_LAYER, false);
-      } else {
-        map.setFilter(AMENITIES_LAYER, [
-          "match",
-          ["get", "amenity"],
-          enabledAmenities,
-          true,
-          false
-        ]);
-      }
     });
   }
 
@@ -365,13 +355,56 @@ function MapFountains() {
 
       map.addSource(AMENITIES_SOURCE, {
         type: "geojson",
-        data: { type: "FeatureCollection", features: [] }
+        data: { type: "FeatureCollection", features: [] },
+        cluster: true,
+        clusterMaxZoom: CLUSTER_MAX_ZOOM,
+        clusterRadius: 50
+      });
+
+      map.addLayer({
+        id: CLUSTERS_LAYER,
+        type: "circle",
+        source: AMENITIES_SOURCE,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#0ea5e9",
+          "circle-opacity": 0.92,
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#ffffff",
+          // grows with the count, so a big cluster reads as big at a glance
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            16,
+            10,
+            20,
+            50,
+            25,
+            200,
+            31
+          ]
+        }
+      });
+
+      map.addLayer({
+        id: CLUSTER_COUNT_LAYER,
+        type: "symbol",
+        source: AMENITIES_SOURCE,
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": ["get", "point_count_abbreviated"],
+          "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+          "text-size": 14,
+          "text-allow-overlap": true
+        },
+        paint: { "text-color": "#ffffff" }
       });
 
       map.addLayer({
         id: AMENITIES_LAYER,
         type: "symbol",
         source: AMENITIES_SOURCE,
+        filter: ["!", ["has", "point_count"]],
         layout: {
           "icon-image": ["get", "icon"],
           "icon-allow-overlap": true,
@@ -380,23 +413,51 @@ function MapFountains() {
         }
       });
 
-      // Click handler
-      map.on("click", AMENITIES_LAYER, e => {
-        const feature = e.features?.[0];
-        if (feature?.properties?.key) {
-          const node = nodesRef.current[feature.properties.key];
-          if (node) {
-            setOpenedNode(node);
-          }
+      // A single handler for both layers: per-layer `map.on("click", layer)`
+      // listeners fire independently, so one tap landing on an icon that
+      // overlaps a cluster bubble would open the sheet AND zoom away.
+      map.on("click", e => {
+        // the map stays live under the coordinate-picking overlay, and a stray
+        // easeTo there would silently move the pin the user is placing
+        if (isPickingCoordinatesRef.current) return;
+
+        const [marker] = map.queryRenderedFeatures(e.point, {
+          layers: [AMENITIES_LAYER]
+        });
+
+        if (marker?.properties?.key) {
+          const node = nodesRef.current[marker.properties.key];
+          if (node) setOpenedNode(node);
+          return;
         }
+
+        const [cluster] = map.queryRenderedFeatures(e.point, {
+          layers: [CLUSTERS_LAYER]
+        });
+
+        if (!cluster) return;
+
+        const center = (cluster.geometry as GeoJSON.Point).coordinates as [
+          number,
+          number
+        ];
+        const source = map.getSource(AMENITIES_SOURCE) as mapboxgl.GeoJSONSource;
+
+        source.getClusterExpansionZoom(cluster.properties!.cluster_id, (err, zoom) => {
+          // cluster ids are invalidated by every setData, so a refresh landing
+          // between tap and reply makes this fail — still zoom in, just coarsely
+          map.easeTo({ center, zoom: err ? map.getZoom() + 2 : zoom });
+        });
       });
 
       // Pointer cursor on hover
-      map.on("mouseenter", AMENITIES_LAYER, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", AMENITIES_LAYER, () => {
-        map.getCanvas().style.cursor = "";
+      [AMENITIES_LAYER, CLUSTERS_LAYER].forEach(layer => {
+        map.on("mouseenter", layer, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", layer, () => {
+          map.getCanvas().style.cursor = "";
+        });
       });
 
       updateAmenitiesFnRef.current();
@@ -446,9 +507,9 @@ function MapFountains() {
     });
   });
 
-  // Update layer filter when filters change
+  // Rebuild the source when filters change, so cluster counts stay in sync
   useEffect(() => {
-    updateLayerFilter();
+    updateGeoJsonSource();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 

@@ -10,6 +10,11 @@ import { AmenityTags, getAmenityColor } from "./getOpenStreetMapAmenities";
 
 export const AMENITIES_SOURCE = "amenities-source";
 export const AMENITIES_LAYER = "amenities-layer";
+export const CLUSTERS_LAYER = "amenities-clusters-layer";
+export const CLUSTER_COUNT_LAYER = "amenities-cluster-count-layer";
+
+/** At and below this zoom, nearby amenities collapse into a numbered bubble. */
+export const CLUSTER_MAX_ZOOM = 14;
 
 const ICON_SIZE = 48;
 const COLORS = ["white", "gold", "#d0d0d0"];
