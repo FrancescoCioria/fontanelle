@@ -267,14 +267,6 @@ function MapFountains() {
         const map = mapRef.current;
         if (!map) return;
 
-        if (
-          previousCenterRef.current.lat === 0 &&
-          previousCenterRef.current.lng === 0
-        ) {
-          previousCenterRef.current = map.getCenter();
-          return;
-        }
-
         const distanceInMeters = distance(
           [map.getCenter().lat, map.getCenter().lng],
           [previousCenterRef.current.lat, previousCenterRef.current.lng],
@@ -332,6 +324,14 @@ function MapFountains() {
         }
       }
     } catch { /* ignore corrupt data */ }
+
+    // Seed the "have we moved far since the last fetch?" baseline with where we
+    // actually start (and fetch for, in on("load")). ⚠️ Leaving it at {0,0} made
+    // the debounce treat the very first real move — the GPS jump that flies the
+    // map to the user on open — as the throwaway first run: it got swallowed, so
+    // no data loaded for the user's location and the "search this area" button
+    // never appeared.
+    previousCenterRef.current = { lng: initial.lng, lat: initial.lat };
 
     const map = new mapboxgl.Map({
       container: "map",
