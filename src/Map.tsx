@@ -84,6 +84,13 @@ function MapFountains() {
   });
   const loadingBarRef = useRef<LoadingBarRef>(null);
   const lastSourceDataRef = useRef<{ [k: string]: string }>({});
+  // Center of the last API search, so an incoming GPS fix can tell whether it
+  // landed inside already-fetched data (null = we haven't searched yet).
+  const searchedCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  const gpsResolvedRef = useRef(false);
+  const gpsFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // Mirror state in refs so callbacks/event-handlers always read fresh values
   const aroundRef = useRef(around);
@@ -171,15 +178,15 @@ function MapFountains() {
     }
   }
 
-  function updateCachedAmenities() {
+  function updateCachedAmenities(center?: { lat: number; lng: number }) {
     getMap(map => {
-      const center = map.getCenter();
+      const c = center ?? map.getCenter();
 
       localforage.getItem<OpenStreetMapNode[]>(CACHE_KEY).then(items => {
         if (items) {
           const nodesInRadius = items.filter(node => {
             const distanceInMeters = distance(
-              [center.lng, center.lat],
+              [c.lng, c.lat],
               [node.lon, node.lat],
               { units: "meters" }
             );
@@ -193,9 +200,14 @@ function MapFountains() {
     });
   }
 
-  function updateAmenities() {
+  function updateAmenities(center?: { lat: number; lng: number }) {
     getMap(map => {
-      updateCachedAmenities();
+      const c = center ?? map.getCenter();
+      updateCachedAmenities(c);
+
+      // Remember where we searched so an incoming GPS fix can decide whether it
+      // already sits inside fresh data or needs a new fetch.
+      searchedCenterRef.current = { lat: c.lat, lng: c.lng };
 
       if (loadingBarRef.current) {
         // @ts-ignore (continuousStart args are optional)
@@ -204,8 +216,8 @@ function MapFountains() {
 
       getOpenStreetMapAmenities({
         around: aroundRef.current,
-        lat: map.getCenter().lat,
-        lng: map.getCenter().lng
+        lat: c.lat,
+        lng: c.lng
       })
         .then(addAmenitiesMarkers)
         .catch(e => {
@@ -349,17 +361,57 @@ function MapFountains() {
 
     mapInstance = map;
 
-    map.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        },
-        showUserHeading: true,
-        showAccuracyCircle: true,
-        trackUserLocation: true
-      }),
-      "bottom-right"
-    );
+    const geolocate = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+      showUserHeading: true,
+      showAccuracyCircle: true,
+      trackUserLocation: true
+    });
+    map.addControl(geolocate, "bottom-right");
+
+    // Opening the app should show what's around you *now*. When GPS answers,
+    // search around the user — but only if that fix falls outside the circle we
+    // already searched, so standing still (trackUserLocation fires repeatedly)
+    // or a fix near the opening spot doesn't refetch. Walking out of the circle
+    // later re-triggers it too.
+    geolocate.on("geolocate", (e: any) => {
+      const gps = { lat: e.coords.latitude, lng: e.coords.longitude };
+      gpsResolvedRef.current = true;
+      if (gpsFallbackTimerRef.current) {
+        clearTimeout(gpsFallbackTimerRef.current);
+        gpsFallbackTimerRef.current = null;
+      }
+
+      const searched = searchedCenterRef.current;
+      const insideSearched =
+        searched &&
+        distance([searched.lng, searched.lat], [gps.lng, gps.lat], {
+          units: "meters"
+        }) <= aroundRef.current;
+      if (insideSearched) return;
+
+      // Baseline the move-debounce to the user's spot so the control's fly-to
+      // doesn't pop the "search this area" button on top of the fetch we're
+      // about to run.
+      previousCenterRef.current = { lng: gps.lng, lat: gps.lat };
+      setShowSearchThisAreaButton(false);
+      updateAmenitiesFnRef.current(gps);
+    });
+
+    // GPS denied/unavailable → don't leave the map empty; search the opening
+    // position instead of waiting out the fallback timer.
+    geolocate.on("error", () => {
+      if (gpsResolvedRef.current) return;
+      gpsResolvedRef.current = true;
+      if (gpsFallbackTimerRef.current) {
+        clearTimeout(gpsFallbackTimerRef.current);
+        gpsFallbackTimerRef.current = null;
+      }
+      previousCenterRef.current = map.getCenter();
+      updateAmenitiesFnRef.current();
+    });
 
     map.addControl(
       new mapboxgl.NavigationControl({
@@ -503,11 +555,22 @@ function MapFountains() {
         });
       });
 
-      updateAmenitiesFnRef.current();
+      // Show cached markers for the opening position instantly (offline-friendly),
+      // but hold the API search until GPS says where the user actually is — see
+      // the geolocate handler above. If GPS never answers, fall back to searching
+      // the opening position so the map still fills in.
+      updateCachedAmenities();
 
       if (showRadiusRef.current) {
         showRadiusFnRef.current();
       }
+
+      gpsFallbackTimerRef.current = setTimeout(() => {
+        if (gpsResolvedRef.current) return;
+        gpsResolvedRef.current = true;
+        previousCenterRef.current = map.getCenter();
+        updateAmenitiesFnRef.current();
+      }, 6000);
 
       (
         document.querySelector(".mapboxgl-ctrl-geolocate") as HTMLElement
@@ -534,6 +597,10 @@ function MapFountains() {
     });
 
     return () => {
+      if (gpsFallbackTimerRef.current) {
+        clearTimeout(gpsFallbackTimerRef.current);
+        gpsFallbackTimerRef.current = null;
+      }
       if (mapInstance) {
         mapInstance.remove();
         mapRef.current = null;
