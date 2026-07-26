@@ -34,6 +34,13 @@ Anche le modifiche passano dal server: quando aggiungi o correggi un punto,
 cache è aggiornata nell'istante in cui la modifica va a buon fine — senza
 aspettare che Overpass se ne accorga.
 
+Quando la mappa è vuota te lo dice: distingue «qui non c'è niente» — e lo
+afferma solo quando ha davvero tutti i dati della zona — da «OpenStreetMap non
+risponde» e da «sei offline, questi sono i punti salvati».
+
+All'apertura si centra sulla tua posizione con una vista larga, in cui entra
+tutta l'area che sta cercando; il pulsante della posizione ti porta vicino.
+
 ## Sviluppo
 
 ```bash

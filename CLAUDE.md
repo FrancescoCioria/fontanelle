@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `yarn db:init` / `yarn db:init:remote` — Apply `schema.sql` to the local / remote D1
 - `yarn deploy` — Deploy to Cloudflare Pages (static build **and** Functions)
 
-Uses Vite with `vite-plugin-pwa` for service worker generation and `vite-plugin-node-polyfills` for Node polyfills (timers, buffer, stream).
+Uses Vite with `vite-plugin-pwa` for service worker generation. ⚠️ No Node polyfills: `vite-plugin-node-polyfills` went out with `xml2js` (the write path builds its own XML server-side) — it was an always-loaded ~200 KiB chunk nothing referenced. Verified by grepping the built bundle for `Buffer`/`process`/`stream`; don't re-add it without that check.
 
 ## Deployment
 
@@ -37,7 +37,8 @@ Scope note: "fontanelle" is a legacy name — the app is about outdoor amenities
    - Anything whose final amenity isn't in `amenities` is dropped rather than stored — an unrenderable entry would otherwise sit in D1 and IndexedDB forever.
 1. **`GET /api/amenities?lat&lon&radius`** (`functions/api/amenities.ts`) — the only door to OSM.
    - **Tiles are the cache unit** (`functions/lib/tiles.ts`, z12 ≈ 6.9km at lat 45). A `(around:R,lat,lon)` query has an unbounded key, so nothing is ever a hit; snapping to a fixed slippy grid means two users on the same street share the same rows. ⚠️ Changing `TILE_ZOOM` orphans every cached tile (the zoom is in the key) — clear `tiles` if you do.
-   - **Reads are by bounding box, writes are by tile.** A node is stored under the tile *containing its point*, not the tile whose query returned it (Overpass returns ways merely touching the bbox). That's what makes "delete what this tile no longer returns" — `DELETE … WHERE tile=? AND updated_at < now` after the upserts — safe, and it's how an amenity deleted in OSM eventually disappears here.
+   - **Reads are by bounding box, writes are by tile.** A node is stored under the tile *containing its point*, not the tile whose query returned it (Overpass returns ways merely touching the bbox). That's what makes "delete what this tile no longer returns" safe, and it's how an amenity deleted in OSM eventually disappears here.
+   - ⚠️ **That delete measures against the Overpass answer's own `osm3s.timestamp_osm_base`, NEVER against the clock.** Overpass replicates with a lag (measured 2026-07-26: 1.3–1.9 min), so its answer legitimately lacks a node created a minute ago — deleting against `now` erases exactly the freshest rows, including the edit a user just made through `/api/osm`. Reproduced: the node vanished on the very next tile refresh and, since that refresh marks the tile fresh, stayed gone for the 30-day TTL. Falls back to `now − 15min` if an instance omits the timestamp.
    - ⚠️ **`MAX_REFRESH_PER_REQUEST` caps fetching, never reading.** Everything already cached for the area comes back regardless, or a wide radius would hide its own cached tiles behind its refresh budget.
    - ⚠️ **The response does not wait for Overpass.** After `RESPONSE_BUDGET_MS` (6s) the Function answers with whatever D1 holds, flags `partial: true`, and hands the unfinished fetches to `context.waitUntil` — they land in D1 for the client's follow-up call. `Map.tsx` re-requests on `partial` with a backoff (`PARTIAL_RETRY_DELAYS_MS`), each round returning everything landed so far.
    - `tiles.retry_after` answers one question — "may anyone fetch this tile now?" — and covers both a claim (someone is fetching; don't duplicate) and a cooldown after a failure (don't let the client's retry loop hammer a sick instance). ⚠️ Tiles held this way must count towards `partial`, or the client stops retrying while its data is still in flight.
