@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    // Workers runtime, not the DOM: the same `shared/` files compile under both
+    // this and the root tsconfig, which is exactly the guarantee we want.
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": [".", "../shared"]
+}

@@ -1,0 +1,11 @@
+name = "fontanelle"
+compatibility_date = "2026-07-26"
+pages_build_output_dir = "dist"
+
+# ⚠️ Deploy target is Cloudflare Pages on fontanelle.pages.dev and nowhere else:
+# the OSM OAuth redirect_uri is registered on that exact domain.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fontanelle-db"
+database_id = "baa0b60d-9044-4e1a-9ed5-3ab3ba382974"

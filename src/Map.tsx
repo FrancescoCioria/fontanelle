@@ -10,6 +10,7 @@ import getOpenStreetMapAmenities, {
   editableAmenities,
   mergeNearbyNodes,
   nodeKey,
+  invalidateServerTile,
   CACHE_KEY
 } from "./getOpenStreetMapAmenities";
 import distance from "@turf/distance";
@@ -37,6 +38,15 @@ import { useAppStore } from "./store";
 import "./map.scss";
 
 const mapboxgl = window.mapboxgl;
+
+/**
+ * A `partial` answer means the server is still fetching tiles behind the reply
+ * it just sent. Backing off rather than polling: an Overpass instance can
+ * legitimately take a minute on a dense tile, and these delays add up to about
+ * that. Each round returns everything landed so far, so an interrupted chain
+ * still leaves the map fuller than it was.
+ */
+const PARTIAL_RETRY_DELAYS_MS = [4000, 8000, 15000, 30000, 60000, 60000];
 
 const amenitiesMapOrder: { [k in Amenity]: number } = {
   drinking_water: 1,
@@ -89,6 +99,12 @@ function MapFountains() {
   const searchedCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const gpsResolvedRef = useRef(false);
   const gpsFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  // A `partial` answer means the server couldn't refresh every tile inside its
+  // deadline. Nothing is lost — the tiles it did fetch are already in the
+  // reply — so we simply come back for the rest.
+  const partialRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
 
@@ -200,10 +216,19 @@ function MapFountains() {
     });
   }
 
-  function updateAmenities(center?: { lat: number; lng: number }) {
+  function updateAmenities(
+    center?: { lat: number; lng: number },
+    retry = 0
+  ) {
     getMap(map => {
       const c = center ?? map.getCenter();
       updateCachedAmenities(c);
+
+      // A newer search wins: drop any retry still queued for the old centre.
+      if (partialRetryTimerRef.current) {
+        clearTimeout(partialRetryTimerRef.current);
+        partialRetryTimerRef.current = null;
+      }
 
       // Remember where we searched so an incoming GPS fix can decide whether it
       // already sits inside fresh data or needs a new fetch.
@@ -219,7 +244,16 @@ function MapFountains() {
         lat: c.lat,
         lng: c.lng
       })
-        .then(addAmenitiesMarkers)
+        .then(({ nodes, partial }) => {
+          addAmenitiesMarkers(nodes);
+
+          if (partial && retry < PARTIAL_RETRY_DELAYS_MS.length) {
+            partialRetryTimerRef.current = setTimeout(() => {
+              partialRetryTimerRef.current = null;
+              updateAmenitiesFnRef.current(c, retry + 1);
+            }, PARTIAL_RETRY_DELAYS_MS[retry]);
+          }
+        })
         .catch(e => {
           if (e instanceof DOMException && e.name === "AbortError") return;
           setErrorMessage("Failed to load amenities. Please try again.");
@@ -601,6 +635,10 @@ function MapFountains() {
         clearTimeout(gpsFallbackTimerRef.current);
         gpsFallbackTimerRef.current = null;
       }
+      if (partialRetryTimerRef.current) {
+        clearTimeout(partialRetryTimerRef.current);
+        partialRetryTimerRef.current = null;
+      }
       if (mapInstance) {
         mapInstance.remove();
         mapRef.current = null;
@@ -708,6 +746,10 @@ function MapFountains() {
               nodesRef.current[nodeKey(node)] = node;
               updateCachedItems([node]);
             }
+
+            // The server holds a tile for 30 days; without this the user's own
+            // edit would be missing from the next reload of this area.
+            invalidateServerTile(node.lat, node.lon);
 
             updateGeoJsonSource();
             setUpsertNode(null);

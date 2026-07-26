@@ -10,152 +10,29 @@ import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
 import PicnicMarker from "./PicnicMarker";
 import OpeningHours from "opening_hours";
+import {
+  Amenity,
+  AmenityTags,
+  OpenStreetMapNode,
+  nodeKey
+} from "../shared/amenities";
 
 import "localforage-getitems";
 
-export type AmenityTags = { mapillary?: string } & (
-  | {
-      amenity: "drinking_water";
-      indoor?: "yes" | "no";
-    }
-  | {
-      amenity: "toilets";
-      access?: "yes" | "public" | "permissive" | "unknown";
-      changing_table?: "yes" | "no" | "unknown";
-      fee?: "yes" | "no" | "unknown";
-      charge?: string;
-      wheelchair?: "yes" | "no" | "unknown" | "limited";
-      unisex?: "yes" | "male" | "female";
-      opening_hours?: string;
-      "toilets:disposal"?: "flush" | "chemical" | "pitlatrine";
-      indoor?: "yes" | "no";
-    }
-  | {
-      amenity: "shower";
-      access?: "yes" | "public" | "permissive" | "unknown";
-      hot_water?: "yes" | "no" | "unknown";
-      fee?: "yes" | "no" | "unknown";
-      charge?: string;
-      wheelchair?: "yes" | "no" | "unknown" | "limited";
-      opening_hours?: string;
-      indoor?: "yes" | "no";
-    }
-  | {
-      amenity: "public_bath";
-      access?: "yes" | "public" | "permissive" | "unknown";
-      fee?: "yes" | "no" | "unknown";
-      charge?: string;
-      opening_hours?: string;
-      indoor?: "yes" | "no";
-    }
-  | {
-      amenity: "bicycle_repair_station";
-      indoor?: "yes" | "no";
-    }
-  | {
-      amenity: "device_charging_station";
-      indoor?: "yes" | "no";
-    }
-  // OSM tags playgrounds as `leisure=playground`, not `amenity=*`.
-  // We normalize them into this pseudo-amenity when parsing the Overpass
-  // response — see `normalizeElement`.
-  | {
-      amenity: "playground";
-      name?: string;
-      access?: "yes" | "public" | "permissive" | "unknown" | "private";
-      fee?: "yes" | "no" | "unknown";
-      charge?: string;
-      opening_hours?: string;
-      min_age?: string;
-      max_age?: string;
-      surface?: string;
-      wheelchair?: "yes" | "no" | "unknown" | "limited";
-      fenced?: "yes" | "no";
-      lit?: "yes" | "no";
-      indoor?: "yes" | "no";
-    }
-  // `leisure=picnic_table` (one table) and `tourism=picnic_site` (the area
-  // around them), normalized together — see `PSEUDO_AMENITIES`
-  | {
-      amenity: "picnic";
-      name?: string;
-      access?: "yes" | "public" | "permissive" | "unknown" | "private";
-      fee?: "yes" | "no" | "unknown";
-      charge?: string;
-      opening_hours?: string;
-      covered?: "yes" | "no";
-      backrest?: "yes" | "no";
-      wheelchair?: "yes" | "no" | "unknown" | "limited";
-      indoor?: "yes" | "no";
-    }
-);
-
-/**
- * Amenities OSM files under a key other than `amenity`. One table drives both
- * the Overpass query and the parsing, so the two can't drift apart.
- * ⚠️ Must be declared before `editableAmenities`, which reads it at module load.
- */
-const PSEUDO_AMENITIES: {
-  key: string;
-  value: string;
-  amenity: Amenity;
-}[] = [
-  { key: "leisure", value: "playground", amenity: "playground" },
-  // a picnic site is the area, a picnic table the furniture in it — the same
-  // place to someone looking for somewhere to eat outdoors
-  { key: "leisure", value: "picnic_table", amenity: "picnic" },
-  { key: "tourism", value: "picnic_site", amenity: "picnic" }
-];
-
-const PSEUDO_AMENITY_NAMES: Amenity[] = PSEUDO_AMENITIES.map(p => p.amenity);
-
-/**
- * Despite the name, this can also be a way or a relation (playgrounds are
- * usually mapped as areas). `lat`/`lon` are then the geometric center, and
- * the element is read-only — see `isEditable`.
- */
-export type OpenStreetMapNode = {
-  id: number;
-  lat: number;
-  lon: number;
-  tags: AmenityTags;
-  elementType?: "node" | "way" | "relation";
-};
-
-/** Unique across element types: way/123 and node/123 are different objects. */
-export const nodeKey = (node: OpenStreetMapNode): string =>
-  `${node.elementType || "node"}/${node.id}`;
-
-/**
- * Pseudo-amenities are read-only: they live under a key other than `amenity`
- * (`leisure`, `tourism`), which the OSM write path (`osm.ts`) can't serialize
- * back — it would write `amenity=playground`, which means nothing in OSM.
- */
-const isEditableAmenity = (amenity: Amenity) =>
-  !PSEUDO_AMENITY_NAMES.includes(amenity);
-
-/** Only plain nodes we know how to tag back can be created/edited/deleted. */
-export const isEditable = (node: OpenStreetMapNode): boolean =>
-  (node.elementType || "node") === "node" &&
-  isEditableAmenity(node.tags.amenity);
-
-const amenitiesMap: { [k in Amenity]: Amenity } = {
-  drinking_water: "drinking_water",
-  shower: "shower",
-  toilets: "toilets",
-  public_bath: "public_bath",
-  bicycle_repair_station: "bicycle_repair_station",
-  device_charging_station: "device_charging_station",
-  playground: "playground",
-  picnic: "picnic"
-};
-
-export const amenities = Object.values(amenitiesMap);
-
-/** Amenities the user can add from the app. */
-export const editableAmenities = amenities.filter(isEditableAmenity);
-
-export type Amenity = AmenityTags["amenity"];
+// The vocabulary and the Overpass↔app normalization live in `shared/` because
+// the server parses with the very same code — see shared/amenities.ts.
+export {
+  amenities,
+  editableAmenities,
+  isEditable,
+  nodeKey,
+  normalizeElement
+} from "../shared/amenities";
+export type {
+  Amenity,
+  AmenityTags,
+  OpenStreetMapNode
+} from "../shared/amenities";
 
 export type Options = {
   around: number;
@@ -276,118 +153,25 @@ export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
   localforage.setItem(CACHE_KEY, nodes);
 };
 
-// ⚠️ Only world-wide instances. overpass.osm.ch was removed 2026-07-19: it only
-// serves Switzerland, so failing over to it returned `200 []` for Milan — an
-// empty map with no error.
-const OVERPASS_ENDPOINTS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.private.coffee/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter"
-];
-
-let currentEndpointIndex = 0;
-
-const fetchWithRetry = async (
-  query: string,
-  signal?: AbortSignal,
-  around?: number
-): Promise<Response> => {
-  const timeoutMs = Math.min(
-    10000 + ((around || 1000) - 1000) * (20000 / 9000),
-    30000
-  );
-  const totalAttempts = OVERPASS_ENDPOINTS.length;
-
-  for (let attempt = 0; attempt < totalAttempts; attempt++) {
-    const endpoint =
-      OVERPASS_ENDPOINTS[
-        (currentEndpointIndex + attempt) % OVERPASS_ENDPOINTS.length
-      ];
-
-    try {
-      const timeout = AbortSignal.timeout(timeoutMs);
-      const combinedSignal = signal
-        ? AbortSignal.any([signal, timeout])
-        : timeout;
-      const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
-        signal: combinedSignal
-      });
-
-      if (res.ok) {
-        // Remember this working endpoint for next time
-        currentEndpointIndex =
-          (currentEndpointIndex + attempt) % OVERPASS_ENDPOINTS.length;
-        return res;
-      }
-
-      if (res.status === 429 || res.status >= 500) {
-        // Try next endpoint
-        continue;
-      }
-
-      throw new Error(`Overpass API error: ${res.status} ${res.statusText}`);
-    } catch (e) {
-      if (signal?.aborted) throw e;
-      if (attempt === totalAttempts - 1) throw e;
-      // Network error — try next endpoint
-    }
-  }
-
-  throw new Error("All Overpass API endpoints failed");
-};
-
 let currentRequest: AbortController | null = null;
 
-const isKnownAmenity = (value?: string): value is Amenity =>
-  !!value && (amenities as string[]).includes(value);
-
-/** Overpass element as returned by `out center` (ways/relations have no lat/lon). */
-export type OverpassElement = {
-  type: "node" | "way" | "relation";
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: { [k: string]: string };
+export type AmenitiesResponse = {
+  nodes: OpenStreetMapNode[];
+  /** Some tiles didn't refresh in time. Ask again shortly; nothing is lost. */
+  partial: boolean;
 };
 
-export const normalizeElement = (
-  element: OverpassElement
-): OpenStreetMapNode | null => {
-  const lat = element.lat ?? element.center?.lat;
-  const lon = element.lon ?? element.center?.lon;
-
-  if (!element.tags || lat === undefined || lon === undefined) return null;
-
-  // An `amenity` we support always wins; the pseudo key is the fallback.
-  // ⚠️ NOT `!element.tags.amenity`: a playground can carry an unrelated amenity
-  // (real case, way/583656299: `leisure=playground` + `amenity=traffic_park`),
-  // and keeping the foreign value makes it vanish downstream — and get cached
-  // that way. Conversely an `amenity=toilets` that also has a picnic table
-  // stays a toilet.
-  const pseudo = isKnownAmenity(element.tags.amenity)
-    ? undefined
-    : PSEUDO_AMENITIES.find(p => element.tags![p.key] === p.value);
-
-  // ⚠️ Rewrite ONLY the key that actually matched. Tags dropped here are also
-  // dropped on save (osmUpdateNode replaces the whole tag set), so stripping
-  // `leisure` unconditionally would delete e.g. `leisure=sauna` from an
-  // `amenity=public_bath` node the user merely edits the fee of.
-  let tags = element.tags as AmenityTags;
-
-  if (pseudo) {
-    const { [pseudo.key]: _matched, ...rest } = element.tags;
-    tags = { ...rest, amenity: pseudo.amenity } as AmenityTags;
-  }
-
-  // never cache something we can't render: it would sit in IndexedDB forever
-  if (!isKnownAmenity(tags.amenity)) return null;
-
-  return { id: element.id, lat, lon, elementType: element.type, tags };
-};
-
-export default async (options: Options): Promise<OpenStreetMapNode[]> => {
+/**
+ * Asks our own server, never Overpass.
+ *
+ * Everything hard — endpoint failover, retries, rate limits, concurrency, the
+ * shared cache — happens server-side (`functions/api/amenities.ts`). The public
+ * Overpass instances are too slow and too often down to be a browser's problem:
+ * on 2026-07-26 all four answered a Paris query with a 504 or 17s, which from
+ * here is just an empty map. The local IndexedDB copy stays, but as an offline
+ * convenience, not as the thing that makes the app work.
+ */
+export default async (options: Options): Promise<AmenitiesResponse> => {
   if (currentRequest) {
     currentRequest.abort();
   }
@@ -395,49 +179,46 @@ export default async (options: Options): Promise<OpenStreetMapNode[]> => {
   const controller = new AbortController();
   currentRequest = controller;
 
-  const around = `(around:${options.around},${options.lat},${options.lng})`;
-
-  const osmAmenities = amenities.filter(
-    a => !PSEUDO_AMENITY_NAMES.includes(a)
-  );
-
-  // one branch per non-`amenity` key, values anchored so `picnic_table` can't
-  // also match e.g. `picnic_table_covered`
-  const pseudoBranches = [...new Set(PSEUDO_AMENITIES.map(p => p.key))].map(
-    key =>
-      `nwr["${key}"~"^(${PSEUDO_AMENITIES.filter(p => p.key === key)
-        .map(p => p.value)
-        .join("|")})$"]${around};`
-  );
-
-  // `out center` gives areas (most playgrounds are ways/relations) a single
-  // representative point instead of their full geometry
-  const query = `
-    [out:json];
-    (
-      nwr["amenity"~"^(${osmAmenities.join("|")})$"]${around};
-      ${pseudoBranches.join("\n      ")}
-    );
-    out center;
-  `;
+  const params = new URLSearchParams({
+    lat: String(options.lat),
+    lon: String(options.lng),
+    radius: String(options.around)
+  });
 
   try {
-    const res = await fetchWithRetry(query, controller.signal, options.around);
+    const res = await fetch(`/api/amenities?${params}`, {
+      signal: controller.signal
+    });
 
-    const json: { elements: OverpassElement[] } = await res.json();
+    if (!res.ok) {
+      throw new Error(`amenities API error: ${res.status} ${res.statusText}`);
+    }
 
-    const nodes = json.elements
-      .map(normalizeElement)
-      .filter((n): n is OpenStreetMapNode => n !== null);
+    const json: AmenitiesResponse = await res.json();
+    const nodes = json.nodes || [];
 
     updateCachedItems(nodes);
 
-    return nodes;
+    return { nodes, partial: !!json.partial };
   } finally {
     if (currentRequest === controller) {
       currentRequest = null;
     }
   }
+};
+
+/**
+ * Tells the server that the tile around a point is out of date, right after the
+ * user edits OSM from the app — otherwise their own new fountain would be
+ * missing until the 30-day tile TTL expires. Best-effort: a failure here only
+ * means the edit shows up later.
+ */
+export const invalidateServerTile = (lat: number, lon: number): void => {
+  fetch("/api/invalidate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lat, lon })
+  }).catch(() => undefined);
 };
 
 export const getAmenityColor = (amenityTags: AmenityTags): string => {

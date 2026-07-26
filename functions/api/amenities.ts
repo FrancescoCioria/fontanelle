@@ -1,0 +1,264 @@
+import {
+  OpenStreetMapNode,
+  normalizeElement,
+  overpassQuery
+} from "../../shared/amenities";
+import { overpassFetch, pool } from "../lib/overpass";
+import {
+  claimTile,
+  failTile,
+  readNodesInBBox,
+  readTileStates,
+  writeTile
+} from "../lib/store";
+import {
+  Tile,
+  distanceMeters,
+  radiusBBox,
+  tileBBox,
+  tilesForRadius
+} from "../lib/tiles";
+
+/**
+ * `GET /api/amenities?lat&lon&radius`
+ *
+ * The only door to OpenStreetMap. The browser never talks to Overpass: it asks
+ * here, gets whatever the cache already knows straight away, and the server
+ * decides — behind that answer — which tiles are worth refetching, in what
+ * order, with which retries. What the client keeps is a copy for offline, not
+ * the source of truth.
+ */
+
+type Env = { DB: D1Database };
+
+/** OSM amenities move at the speed of civil engineering. */
+const TILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** How long a tile stays claimed by the request that is fetching it. */
+const CLAIM_MS = 90 * 1000;
+
+/** Breather after a failed tile, so a bad Overpass day isn't a hammering loop. */
+const FAILURE_COOLDOWN_MS = 30 * 1000;
+
+/**
+ * ⚠️ How long we make the *client* wait, not how long the work takes. Overpass
+ * answering a dense tile in 60s is normal on a bad day (measured 2026-07-26,
+ * Paris); blocking a map on that is not. Past this budget we reply with what is
+ * already in D1, flagged `partial`, and let the fetch finish in `waitUntil` —
+ * the client comes back a few seconds later and the tiles are there.
+ */
+const RESPONSE_BUDGET_MS = 6000;
+
+/** Hard stop for the background half. Two 30s attempts, then give up. */
+const WORK_DEADLINE_MS = 60000;
+
+/**
+ * Tiles fetched at once. ⚠️ Kept low because each tile is *hedged* across up to
+ * 3 instances (see overpass.ts): 2 × 3 is exactly the 6 simultaneous outbound
+ * connections a Worker gets. Raise this and the extra fetches silently queue,
+ * which turns the hedge — whose whole point is not waiting — back into a queue.
+ */
+const FETCH_CONCURRENCY = 2;
+
+/**
+ * Upper bound on tiles *refreshed* in one request, deadline aside. ⚠️ Low on
+ * purpose: pushing 30 tiles through in one go earned a 429 from
+ * overpass-api.de during testing, and a rate limit hurts every user of the app,
+ * not just the one who asked for a 15km radius. The rest fills in over the
+ * client's follow-up calls.
+ *
+ * ⚠️ This caps *fetching*, never *reading*: everything already in D1 for the
+ * requested area comes back regardless, or a wide radius would keep hiding
+ * cached tiles behind its own refresh budget.
+ */
+const MAX_REFRESH_PER_REQUEST = 12;
+
+/** Sanity bound on the area one request may cover at all. */
+const MAX_TILES_PER_REQUEST = 100;
+
+/** Guards the response size when someone asks for 15km of central Paris. */
+const MAX_NODES = 12000;
+
+const MIN_RADIUS = 100;
+const MAX_RADIUS = 20000;
+
+// No CORS headers anywhere in here on purpose: in production the Function is
+// served from the same origin as the app, and in dev Vite proxies /api, so the
+// browser never makes a cross-origin request. Opening it up would only invite
+// other sites to spend our Overpass budget.
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
+    }
+  });
+
+const number = (value: string | null): number | null => {
+  if (value === null || value.trim() === "") return null;
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export const onRequestGet: PagesFunction<Env> = async context => {
+  const url = new URL(context.request.url);
+  const lat = number(url.searchParams.get("lat"));
+  const lon = number(url.searchParams.get("lon"));
+  const radius = number(url.searchParams.get("radius"));
+
+  if (
+    lat === null ||
+    lon === null ||
+    radius === null ||
+    lat < -90 ||
+    lat > 90 ||
+    lon < -180 ||
+    lon > 180
+  ) {
+    return json({ error: "lat, lon and radius are required" }, 400);
+  }
+
+  const around = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, radius));
+  const db = context.env.DB;
+  const startedAt = Date.now();
+
+  const allTiles = tilesForRadius(lat, lon, around);
+  const tiles = allTiles.slice(0, MAX_TILES_PER_REQUEST);
+
+  if (allTiles.length > tiles.length) {
+    // no silent caps: the far edge of a huge radius fills in on later requests
+    console.log(
+      `[amenities] capped tiles ${allTiles.length} -> ${tiles.length} (lat=${lat} lon=${lon} r=${around})`
+    );
+  }
+
+  const states = await readTileStates(
+    db,
+    tiles.map(t => t.key)
+  );
+
+  // Three buckets, and the difference matters to the client: `held` tiles are
+  // someone else's job (or cooling down) — reporting them as done would stop
+  // the client retrying while their data is still on its way.
+  const allStale: Tile[] = [];
+  let held = 0;
+
+  tiles.forEach(tile => {
+    const state = states.get(tile.key);
+
+    if (state && state.retryAfter > startedAt) {
+      held++;
+      return;
+    }
+
+    if (!state || startedAt - state.fetchedAt > TILE_TTL_MS) {
+      allStale.push(tile);
+    }
+  });
+
+  // nearest first (tilesForRadius already sorts), so a clipped budget goes to
+  // what is under the user's nose
+  const stale = allStale.slice(0, MAX_REFRESH_PER_REQUEST);
+  const deferred = allStale.length - stale.length;
+
+  if (deferred > 0) {
+    console.log(
+      `[amenities] deferring ${deferred} stale tiles beyond the refresh budget`
+    );
+  }
+
+  let fetched = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  const work = pool(stale, FETCH_CONCURRENCY, async tile => {
+    if (Date.now() - startedAt > WORK_DEADLINE_MS) {
+      skipped++;
+      return;
+    }
+
+    try {
+      await claimTile(db, tile.key, Date.now() + CLAIM_MS);
+
+      const result = await overpassFetch(overpassQuery(tileBBox(tile)), {
+        deadline: startedAt + WORK_DEADLINE_MS
+      });
+
+      const nodes = result.elements
+        .map(normalizeElement)
+        .filter((n): n is OpenStreetMapNode => n !== null);
+
+      await writeTile(db, tile, nodes, Date.now());
+      fetched++;
+
+      console.log(
+        `[amenities] tile ${tile.key} ok: ${nodes.length}/${result.elements.length} nodes in ${result.ms}ms via ${result.endpoint} (attempt ${result.attempts})`
+      );
+    } catch (e) {
+      failed++;
+      const message = (e as Error).message || String(e);
+      console.log(`[amenities] tile ${tile.key} FAILED: ${message}`);
+      await failTile(
+        db,
+        tile.key,
+        Date.now() + FAILURE_COOLDOWN_MS,
+        message
+      ).catch(() => undefined);
+    }
+  });
+
+  // Give the fetches a short head start — an empty area usually resolves well
+  // inside it — then answer regardless.
+  await Promise.race([work, delay(RESPONSE_BUDGET_MS)]);
+
+  // ⚠️ Not `await`: the point is that the tiles still in flight keep going and
+  // land in D1 after this response, ready for the client's next call.
+  context.waitUntil(work);
+
+  const inBBox = await readNodesInBBox(db, radiusBBox(lat, lon, around));
+
+  const withDistance = inBBox
+    .map(node => ({
+      node,
+      d: distanceMeters({ lat, lon }, { lat: node.lat, lon: node.lon })
+    }))
+    .filter(n => n.d <= around)
+    .sort((a, b) => a.d - b.d);
+
+  if (withDistance.length > MAX_NODES) {
+    console.log(
+      `[amenities] capped nodes ${withDistance.length} -> ${MAX_NODES}`
+    );
+  }
+
+  const nodes = withDistance.slice(0, MAX_NODES).map(n => n.node);
+
+  // `partial` means "ask again in a moment", never "error": the answer already
+  // carries every tile that did land.
+  const inFlight = stale.length - fetched - failed;
+  const partial = inFlight > 0 || failed > 0 || held > 0 || deferred > 0;
+
+  console.log(
+    `[amenities] lat=${lat.toFixed(4)} lon=${lon.toFixed(4)} r=${around} tiles=${tiles.length} stale=${allStale.length} held=${held} fetched=${fetched} failed=${failed} deferred=${deferred} skipped=${skipped} nodes=${nodes.length} partial=${partial} ms=${Date.now() - startedAt}`
+  );
+
+  return json({
+    nodes,
+    partial,
+    tiles: {
+      requested: tiles.length,
+      dropped: allTiles.length - tiles.length,
+      stale: allStale.length,
+      held,
+      fetched,
+      failed,
+      deferred,
+      inFlight
+    }
+  });
+};

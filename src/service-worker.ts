@@ -81,45 +81,9 @@ self.addEventListener("message", event => {
   }
 });
 
-// Any other custom service worker logic can go here.
-
-// registerRoute(
-//   ({ url }) => {
-//     return url.origin === "https://overpass-api.de";
-//   },
-//   new CacheFirst({
-//     cacheName: "overpass-api",
-//     plugins: [
-//       new ExpirationPlugin({
-//         // Only cache requests for a week
-//         maxAgeSeconds: 7 * 24 * 60 * 60
-//       }),
-//       new CacheableResponsePlugin({
-//         statuses: [0, 200]
-//       })
-//     ]
-//   }),
-//   "GET"
-// );
-
-// registerRoute(
-//   ({ url }) => {
-//     return url.origin === "https://overpass.kumi.systems";
-//   },
-//   new CacheFirst({
-//     cacheName: "overpass-api-kumi",
-//     plugins: [
-//       new ExpirationPlugin({
-//         // Only cache requests for a week
-//         maxAgeSeconds: 7 * 24 * 60 * 60
-//       }),
-//       new CacheableResponsePlugin({
-//         statuses: [0, 200]
-//       })
-//     ]
-//   }),
-//   "GET"
-// );
+// The browser no longer talks to Overpass at all — /api/amenities does, and the
+// server caches in D1. The runtime caches that used to sit here (one per
+// Overpass instance) went with it.
 
 registerRoute(
   ({ url }) => {
@@ -172,20 +136,3 @@ registerRoute(
   }),
   "GET"
 );
-
-// self.addEventListener("fetch", event => {
-//   // return GET requests "cache-first"
-//   event.respondWith(
-//     caches.open("mapbox-tiles").then(cache =>
-//       cache
-//         .match(event.request.url, {
-//           ignoreSearch: true,
-//           ignoreVary: true
-//         })
-//         .then(cachedResponse => {
-//           console.log(event.request.url, cachedResponse);
-//           return cachedResponse || fetch(event.request);
-//         })
-//     )
-//   );
-// });

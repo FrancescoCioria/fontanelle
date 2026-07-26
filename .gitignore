@@ -13,6 +13,9 @@
 /build
 /dist
 
+# wrangler local state (local D1, caches)
+/.wrangler
+
 # misc
 .DS_Store
 .env

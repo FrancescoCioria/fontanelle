@@ -32,15 +32,22 @@
   "scripts": {
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p functions/tsconfig.json --noEmit",
+    "dev:api": "wrangler pages dev --port 8788",
+    "db:init": "wrangler d1 execute fontanelle-db --local --file schema.sql",
+    "db:init:remote": "wrangler d1 execute fontanelle-db --remote --file schema.sql",
+    "deploy": "wrangler pages deploy"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260726.1",
     "@types/xml2js": "^0.4.11",
     "@vitejs/plugin-react": "^5.1.4",
     "typescript": "^5.7.0",
     "vite": "^7.3.1",
     "vite-plugin-node-polyfills": "^0.25.0",
     "vite-plugin-pwa": "^1.2.0",
-    "workbox-window": "^7.4.0"
+    "workbox-window": "^7.4.0",
+    "wrangler": "^4.114.0"
   }
 }
