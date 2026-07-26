@@ -219,15 +219,39 @@ export const readNodesInBBox = async (
     .filter((n): n is OpenStreetMapNode => n !== null);
 };
 
-/** Force a tile to be refetched on the next read (used after an OSM edit). */
-export const invalidateTile = (
+/**
+ * Write one node straight into the cache, used after an OSM edit made through
+ * `/api/osm`. ⚠️ The `now` stamp is what protects it: a tile refresh deletes
+ * only rows older than the Overpass answer's own data timestamp, which is
+ * minutes behind — see `writeTile`.
+ */
+export const upsertNode = (
   db: D1Database,
-  key: string
+  node: OpenStreetMapNode,
+  now: number
 ): Promise<unknown> =>
   db
     .prepare(
-      `INSERT INTO tiles (key, fetched_at, retry_after) VALUES (?, 0, 0)
-       ON CONFLICT(key) DO UPDATE SET fetched_at = 0, retry_after = 0`
+      `INSERT INTO nodes (key, tile, lat, lon, amenity, tags, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET
+         tile = excluded.tile,
+         lat = excluded.lat,
+         lon = excluded.lon,
+         amenity = excluded.amenity,
+         tags = excluded.tags,
+         updated_at = excluded.updated_at`
     )
-    .bind(key)
+    .bind(
+      nodeKey(node),
+      tileForPoint(node.lat, node.lon).key,
+      node.lat,
+      node.lon,
+      node.tags.amenity,
+      JSON.stringify(node.tags),
+      now
+    )
     .run();
+
+export const deleteNode = (db: D1Database, key: string): Promise<unknown> =>
+  db.prepare(`DELETE FROM nodes WHERE key = ?`).bind(key).run();

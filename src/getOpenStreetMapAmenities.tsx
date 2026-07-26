@@ -207,20 +207,6 @@ export default async (options: Options): Promise<AmenitiesResponse> => {
   }
 };
 
-/**
- * Tells the server that the tile around a point is out of date, right after the
- * user edits OSM from the app — otherwise their own new fountain would be
- * missing until the 30-day tile TTL expires. Best-effort: a failure here only
- * means the edit shows up later.
- */
-export const invalidateServerTile = (lat: number, lon: number): void => {
-  fetch("/api/invalidate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lat, lon })
-  }).catch(() => undefined);
-};
-
 export const getAmenityColor = (amenityTags: AmenityTags): string => {
   const disabledColor = "#d0d0d0";
 

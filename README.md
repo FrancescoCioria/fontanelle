@@ -29,6 +29,11 @@ strada leggono le stesse righe già scaricate: la prima volta ci vogliono
 Il browser si limita a disegnare i punti e a filtrarli, e ne tiene una copia
 locale per l'uso offline.
 
+Anche le modifiche passano dal server: quando aggiungi o correggi un punto,
+è il server a scriverlo su OpenStreetMap e a rileggere il risultato, così la
+cache è aggiornata nell'istante in cui la modifica va a buon fine — senza
+aspettare che Overpass se ne accorga.
+
 ## Sviluppo
 
 ```bash

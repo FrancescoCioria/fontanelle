@@ -19,6 +19,12 @@ declare namespace OSMAuth {
       options: OSMAuthXHROptions,
       callback: (err: null | any, result?: any) => any
     ): XMLHttpRequest | null;
+    /**
+     * Plain `fetch` with `Authorization: Bearer <token>` added. The URL is used
+     * as given (no API prefix), which is how the write path reaches our own
+     * `/api/osm` with the user's OSM token attached.
+     */
+    fetch(url: string, options?: RequestInit): Promise<Response>;
     rawxhr(
       method: string,
       url: string,

@@ -41,7 +41,7 @@ Scope note: "fontanelle" is a legacy name — the app is about outdoor amenities
    - ⚠️ **`MAX_REFRESH_PER_REQUEST` caps fetching, never reading.** Everything already cached for the area comes back regardless, or a wide radius would hide its own cached tiles behind its refresh budget.
    - ⚠️ **The response does not wait for Overpass.** After `RESPONSE_BUDGET_MS` (6s) the Function answers with whatever D1 holds, flags `partial: true`, and hands the unfinished fetches to `context.waitUntil` — they land in D1 for the client's follow-up call. `Map.tsx` re-requests on `partial` with a backoff (`PARTIAL_RETRY_DELAYS_MS`), each round returning everything landed so far.
    - `tiles.retry_after` answers one question — "may anyone fetch this tile now?" — and covers both a claim (someone is fetching; don't duplicate) and a cooldown after a failure (don't let the client's retry loop hammer a sick instance). ⚠️ Tiles held this way must count towards `partial`, or the client stops retrying while its data is still in flight.
-   - Tile TTL is 30 days. `POST /api/invalidate {lat,lon}` marks one tile stale and is called right after an OSM edit — without it the user's own new fountain would be missing for a month. It only ever invalidates, never accepts data: an unauthenticated write endpoint would let anyone poison the cache.
+   - Tile TTL is 30 days. Edits made in the app don't wait for it — see the write path below.
 2. **Overpass client** (`functions/lib/overpass.ts`) — ⚠️ endpoints are **hedged, not queued**: after `HEDGE_DELAY_MS` without an answer the next instance is asked *as well*, first good reply wins, losers aborted. Trying them one after another is what failed on 2026-07-26 — two dead instances ate the whole deadline before the one instance actually serving Paris was ever asked. Fixing this took a cold Paris fetch from "all four failed" to 4.8s.
    - ⚠️ Only **world-wide** instances belong in the pool. `overpass.osm.ch` was removed 2026-07-19: it serves Switzerland only, so failing over to it returned `200 []` outside CH — an empty map with no error.
    - ⚠️ A `200` is not a success: Overpass reports "runtime error: query timed out" inside a 200 body and proxies answer HTML. Parse before treating the endpoint as healthy, or an empty tile gets cached for a month.
@@ -62,9 +62,18 @@ Scope note: "fontanelle" is a legacy name — the app is about outdoor amenities
 
 ### OSM Integration (`osm.ts`)
 
-Authenticated users can create, update, and delete OSM nodes via the OSM API. **Write path is node-only**: `isEditable` gates it to plain nodes with an editable amenity, and `editableAmenities` gates the add menu. Playgrounds are read-only (they live under `leisure=*`, which this path can't serialize back), as is anything mapped as a way/relation. Uses `osm-auth` for OAuth2 in singlepage mode (redirect-based, no popup). The OAuth app is configured as a public client (no client_secret). All mutations are wrapped in changesets. Node data is serialized to XML via `xml2js` Builder.
+Authenticated users can create, update, and delete OSM nodes. **Write path is node-only**: `isEditable` gates it to plain nodes with an editable amenity, and `editableAmenities` gates the add menu. Playgrounds are read-only (they live under `leisure=*`, which this path can't serialize back), as is anything mapped as a way/relation. `osm-auth` handles OAuth2 in singlepage mode (redirect-based, no popup); the OAuth app is a public client (no client_secret).
 
-This is the one path that stays in the browser, deliberately: the OAuth token is the user's, and `openstreetmap.org/api` — unlike Overpass — is reliable. `BottomSheet`'s single-node refresh goes there directly too, best-effort (`.catch(() => {})`). Only bulk *discovery* is server-side.
+**`POST /api/osm` runs the whole mutation server-side** (`functions/api/osm.ts`): create changeset → read current version → PUT/DELETE → close changeset → **read the node back from the OSM API** → write that into D1.
+
+- ⚠️ **The read-back is the point.** Overpass lags OSM by minutes, so a server that only learned "something changed here" and re-asked Overpass would get an answer that predates the edit — and mark the tile fresh for 30 days. `api.openstreetmap.org` is the only source that already knows. What lands in D1 is what OSM returns, never what the client sent.
+- ⚠️ The row is stamped with the wall clock, and `writeTile` deletes against the Overpass *data* timestamp — that pairing is what keeps the next tile refresh from wiping the edit. Breaking either half re-opens the bug (reproduced 2026-07-26).
+- The user's bearer token rides in `Authorization` and is forwarded to OSM; never stored, never logged. The client gets it there via `osmAuth.fetch`, which attaches the header to any URL — ⚠️ don't hand-read the token out of localStorage, the key is osm-auth's private business.
+- `validate()` repeats the editable-amenity gate server-side: the endpoint is reachable without the add menu, and `amenity=playground` means nothing in OSM.
+- XML is hand-built with `escapeXml` rather than pulling in a builder — the grammar is four attributes and a flat tag list, and every value is user text (`Bar "Le Rêve" & co` in `operator` must not produce a malformed changeset). Removing `xml2js` also took it out of the browser bundle.
+- Errors forward OSM's own status and message (409 version conflict, 401 expired token); `UpsertNode` shows it instead of "please try again", which on a 409 would just loop.
+
+`BottomSheet`'s single-node refresh still reads `openstreetmap.org` directly, best-effort (`.catch(() => {})`) — it's a read, and that host is reliable.
 
 ### Key Types
 
@@ -75,7 +84,8 @@ This is the one path that stays in the browser, deliberately: the OAuth token is
 ### Component Structure
 
 - **`shared/amenities.ts`** — Amenity vocabulary, `normalizeElement`, `overpassQuery`. Shared with the Functions; no React/DOM/Node
-- **`functions/api/amenities.ts`** — The data endpoint (tile freshness, refresh budget, `partial`/`waitUntil`)
+- **`functions/api/amenities.ts`** — The read endpoint (tile freshness, refresh budget, `partial`/`waitUntil`)
+- **`functions/api/osm.ts`** — The write endpoint (changeset, mutation, read-back, D1 update)
 - **`functions/lib/{tiles,overpass,store}.ts`** — Slippy-tile maths, hedged Overpass client, D1 access
 - **`getOpenStreetMapAmenities.tsx`** — Browser side: calls `/api/amenities`, keeps the IndexedDB copy, `mergeNearbyNodes`, marker/colour helpers. Re-exports the `shared/` vocabulary so the rest of `src/` has one import site
 - **`App.tsx`** — Root: renders ServiceWorkerWrapper + Map. Handles OAuth redirect callback (completes token exchange when returning with `?code=`)

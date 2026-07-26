@@ -354,8 +354,11 @@ export const UpsertNodePopup = (props: Props) => {
                         props.onDone(n, "update")
                       );
 
-                promise.catch(() => {
-                  setError("Failed to save. Please try again.");
+                promise.catch((e: Error) => {
+                  // the server forwards what OSM actually said (version
+                  // conflict, expired token, …); "please try again" on a 409
+                  // just sends the user round the same loop
+                  setError(e?.message || "Failed to save. Please try again.");
                   setLoading(false);
                 });
               }}
@@ -382,8 +385,10 @@ export const UpsertNodePopup = (props: Props) => {
 
                     osmDeleteNode({ ...state.node })
                       .then(n => props.onDone(n, "delete"))
-                      .catch(() => {
-                        setError("Failed to delete. Please try again.");
+                      .catch((e: Error) => {
+                        setError(
+                          e?.message || "Failed to delete. Please try again."
+                        );
                         setLoading(false);
                       });
                   }}

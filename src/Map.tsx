@@ -10,7 +10,6 @@ import getOpenStreetMapAmenities, {
   editableAmenities,
   mergeNearbyNodes,
   nodeKey,
-  invalidateServerTile,
   CACHE_KEY
 } from "./getOpenStreetMapAmenities";
 import distance from "@turf/distance";
@@ -746,10 +745,6 @@ function MapFountains() {
               nodesRef.current[nodeKey(node)] = node;
               updateCachedItems([node]);
             }
-
-            // The server holds a tile for 30 days; without this the user's own
-            // edit would be missing from the next reload of this area.
-            invalidateServerTile(node.lat, node.lon);
 
             updateGeoJsonSource();
             setUpsertNode(null);
