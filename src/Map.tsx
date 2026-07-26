@@ -48,6 +48,28 @@ const mapboxgl = window.mapboxgl;
  */
 const PARTIAL_RETRY_DELAYS_MS = [4000, 8000, 15000, 30000, 60000, 60000];
 
+/**
+ * Zoom the locate button settles on: close enough to tell which side of the
+ * street you're on. This is Mapbox's own default, pinned here so the opening
+ * zoom below can be defined against it instead of drifting with the library.
+ */
+const LOCATE_ZOOM = 15;
+
+/**
+ * Zoom the app *opens* at, and the zoom the map keeps while it follows you —
+ * deliberately wider than the button. At the default 1km search radius this is
+ * where the whole searched circle fits a phone screen (~6.8 m/px at lat 45,
+ * ~2.8km across): you land looking at everything the app just fetched, instead
+ * of at one block of it.
+ *
+ * ⚠️ This is also the control's permanent `fitBoundsOptions.maxZoom`, and that
+ * is not incidental. With `trackUserLocation`, Mapbox re-fits the camera on
+ * *every* position update, so a higher cap means the map silently zooms in on
+ * you as you walk (measured: 500m scale → 100m after two GPS ticks). Pressing
+ * the locate button is the only thing that should take you in close.
+ */
+const OPENING_ZOOM = 13;
+
 const amenitiesMapOrder: { [k in Amenity]: number } = {
   drinking_water: 1,
   shower: 2,
@@ -413,7 +435,7 @@ function MapFountains() {
       style:
         "mapbox://styles/francescocioria/cjqi3u6lmame92rmw6aw3uyhm?optimize=true",
       center: initial,
-      zoom: 15.0,
+      zoom: OPENING_ZOOM,
       scrollZoom:
         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
           navigator.userAgent
@@ -430,7 +452,19 @@ function MapFountains() {
       },
       showUserHeading: true,
       showAccuracyCircle: true,
-      trackUserLocation: true
+      trackUserLocation: true,
+      fitBoundsOptions: { maxZoom: OPENING_ZOOM }
+    });
+
+    // A press of the locate button means "take me in close" — the one moment a
+    // zoom change is asked for rather than imposed. ⚠️ The zoom has to happen
+    // on the position event, not here: the control fits the camera itself right
+    // after this fires, and would undo an earlier easeTo.
+    let zoomInOnNextFix = false;
+
+    geolocate.on("trackuserlocationstart", () => {
+      // the opening trigger is ours, not the user's, and stays wide
+      zoomInOnNextFix = gpsResolvedRef.current;
     });
     map.addControl(geolocate, "bottom-right");
 
@@ -441,6 +475,12 @@ function MapFountains() {
     // later re-triggers it too.
     geolocate.on("geolocate", (e: any) => {
       const gps = { lat: e.coords.latitude, lng: e.coords.longitude };
+
+      if (zoomInOnNextFix) {
+        zoomInOnNextFix = false;
+        map.easeTo({ center: gps, zoom: LOCATE_ZOOM });
+      }
+
       gpsResolvedRef.current = true;
       if (gpsFallbackTimerRef.current) {
         clearTimeout(gpsFallbackTimerRef.current);
