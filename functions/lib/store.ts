@@ -100,16 +100,38 @@ export const failTile = (
     .run();
 
 /**
+ * How far back we assume an Overpass answer is lagging when it doesn't tell us
+ * (`osm3s.timestamp_osm_base` missing). Measured lag on 2026-07-26 was 1.3–1.9
+ * minutes; 15 is a wide, cheap margin — the only cost of being too generous is
+ * that a row deleted upstream survives one extra refresh cycle.
+ */
+const ASSUMED_REPLICATION_LAG_MS = 15 * 60 * 1000;
+
+/**
  * Replace a tile's contents. Nodes are stamped with `now`; anything still
  * carrying an older stamp for this tile was not in the answer, so it is gone
  * from OSM (or moved to a neighbouring tile, which re-homed the row already).
+ *
+ * ⚠️ "Older" is measured against `dataTimestamp` — the instant the Overpass
+ * answer describes — and **never against the clock**. Overpass replicates with
+ * a lag, so its answer legitimately does not contain a node created a minute
+ * ago; deleting against `now` therefore erases exactly the freshest rows we
+ * have, the ones a user just wrote through /api/osm. Reproduced 2026-07-26: a
+ * node created in the app vanished on the very next refresh of its tile — and
+ * since that refresh marks the tile fresh, it stayed gone for the 30-day TTL.
  */
 export const writeTile = async (
   db: D1Database,
   tile: Tile,
   nodes: OpenStreetMapNode[],
-  now: number
+  now: number,
+  dataTimestamp: number | null
 ): Promise<void> => {
+  const knownAt = Math.min(
+    dataTimestamp ?? now - ASSUMED_REPLICATION_LAG_MS,
+    now
+  );
+
   const upsert = db.prepare(
     `INSERT INTO nodes (key, tile, lat, lon, amenity, tags, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -143,7 +165,7 @@ export const writeTile = async (
   await db.batch([
     db
       .prepare(`DELETE FROM nodes WHERE tile = ? AND updated_at < ?`)
-      .bind(tile.key, now),
+      .bind(tile.key, knownAt),
     db
       .prepare(
         `INSERT INTO tiles (key, fetched_at, retry_after, node_count, error)

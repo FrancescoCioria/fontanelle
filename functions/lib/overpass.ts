@@ -51,16 +51,29 @@ let cursor = 0;
 
 export type OverpassResult = {
   elements: OverpassElement[];
+  /**
+   * ⚠️ How far behind OSM this answer is, in epoch ms — NOT when we received
+   * it. Overpass instances replicate with a lag (measured 2026-07-26:
+   * 1.3–1.9 minutes), so an answer routinely describes a world in which
+   * something created a minute ago does not exist yet. Anything that decides
+   * "this object is gone" has to reason against this instant, never the clock.
+   */
+  dataTimestamp: number | null;
   endpoint: string;
   attempts: number;
   ms: number;
+};
+
+type Answer = {
+  elements: OverpassElement[];
+  dataTimestamp: number | null;
 };
 
 const attempt = async (
   endpoint: string,
   query: string,
   signal: AbortSignal
-): Promise<OverpassElement[]> => {
+): Promise<Answer> => {
   const res = await fetch(endpoint, {
     method: "POST",
     body: new URLSearchParams({ data: query }),
@@ -77,11 +90,20 @@ const attempt = async (
   // ⚠️ A 200 is not a success: Overpass reports "runtime error: Query timed
   // out" inside a 200 body, and some proxies answer HTML. Parse before treating
   // the endpoint as healthy, or we cache an empty tile for a month.
-  const json = (await res.json()) as { elements?: OverpassElement[] };
+  const json = (await res.json()) as {
+    elements?: OverpassElement[];
+    osm3s?: { timestamp_osm_base?: string };
+  };
 
   if (!Array.isArray(json.elements)) throw new Error("200 without elements");
 
-  return json.elements;
+  const base = json.osm3s?.timestamp_osm_base;
+  const parsed = base ? Date.parse(base) : NaN;
+
+  return {
+    elements: json.elements,
+    dataTimestamp: Number.isFinite(parsed) ? parsed : null
+  };
 };
 
 export const overpassFetch = async (
@@ -97,7 +119,7 @@ export const overpassFetch = async (
     (_, i) => ENDPOINTS[(cursor + i) % ENDPOINTS.length]
   );
 
-  type Settled = { i: number; elements?: OverpassElement[]; error?: string };
+  type Settled = { i: number; answer?: Answer; error?: string };
 
   const inflight = new Map<number, Promise<Settled>>();
   const aborts = new Map<number, AbortController>();
@@ -118,7 +140,7 @@ export const overpassFetch = async (
     inflight.set(
       i,
       attempt(endpoint, query, AbortSignal.any(signals)).then(
-        elements => ({ i, elements }),
+        answer => ({ i, answer }),
         (e: Error) => ({ i, error: `${endpoint} -> ${e.name}: ${e.message}` })
       )
     );
@@ -157,12 +179,13 @@ export const overpassFetch = async (
       inflight.delete(settled.i);
       aborts.delete(settled.i);
 
-      if (settled.elements) {
+      if (settled.answer) {
         const endpoint = order[settled.i];
         cursor = ENDPOINTS.indexOf(endpoint);
 
         return {
-          elements: settled.elements,
+          elements: settled.answer.elements,
+          dataTimestamp: settled.answer.dataTimestamp,
           endpoint,
           attempts: settled.i + 1,
           ms: Date.now() - started

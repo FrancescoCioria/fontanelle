@@ -193,11 +193,11 @@ export const onRequestGet: PagesFunction<Env> = async context => {
         .map(normalizeElement)
         .filter((n): n is OpenStreetMapNode => n !== null);
 
-      await writeTile(db, tile, nodes, Date.now());
+      await writeTile(db, tile, nodes, Date.now(), result.dataTimestamp);
       fetched++;
 
       console.log(
-        `[amenities] tile ${tile.key} ok: ${nodes.length}/${result.elements.length} nodes in ${result.ms}ms via ${result.endpoint} (attempt ${result.attempts})`
+        `[amenities] tile ${tile.key} ok: ${nodes.length}/${result.elements.length} nodes in ${result.ms}ms via ${result.endpoint} (attempt ${result.attempts}, data lag ${result.dataTimestamp ? Math.round((Date.now() - result.dataTimestamp) / 1000) + 's' : 'unknown'})`
       );
     } catch (e) {
       failed++;
