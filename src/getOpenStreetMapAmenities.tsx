@@ -155,10 +155,27 @@ export const updateCachedItems = async (newNodes: OpenStreetMapNode[]) => {
 
 let currentRequest: AbortController | null = null;
 
+/**
+ * ⚠️ `tiles` is not diagnostics — it is the only way the UI can tell "there is
+ * genuinely nothing here" from "OpenStreetMap is down". The server answers 200
+ * with whatever it has either way, which is right for the map and useless for
+ * the user unless these counts are read.
+ */
+export type AmenitiesTiles = {
+  requested: number;
+  /** Tiles we currently cannot get: just failed, or cooling down after failing. */
+  unreachable: number;
+  /** Someone is fetching them right now. */
+  held: number;
+  inFlight: number;
+  deferred: number;
+};
+
 export type AmenitiesResponse = {
   nodes: OpenStreetMapNode[];
   /** Some tiles didn't refresh in time. Ask again shortly; nothing is lost. */
   partial: boolean;
+  tiles: AmenitiesTiles;
 };
 
 /**
@@ -199,7 +216,17 @@ export default async (options: Options): Promise<AmenitiesResponse> => {
 
     updateCachedItems(nodes);
 
-    return { nodes, partial: !!json.partial };
+    return {
+      nodes,
+      partial: !!json.partial,
+      tiles: json.tiles || {
+        requested: 0,
+        unreachable: 0,
+        held: 0,
+        inFlight: 0,
+        deferred: 0
+      }
+    };
   } finally {
     if (currentRequest === controller) {
       currentRequest = null;

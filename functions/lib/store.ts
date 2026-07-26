@@ -12,6 +12,13 @@ export type TileState = {
   key: string;
   fetchedAt: number;
   retryAfter: number;
+  /**
+   * Last failure, or null when healthy. ⚠️ Load-bearing for the UI, not just
+   * diagnostics: `retry_after` alone can't tell "someone is fetching this right
+   * now" from "this just failed and is cooling down", and telling a user things
+   * are still loading when OSM is unreachable is the bug they reported.
+   */
+  error: string | null;
 };
 
 /** D1 documents a 100-bound-parameter ceiling per statement. */
@@ -40,16 +47,22 @@ export const readTileStates = async (
 
     const { results } = await db
       .prepare(
-        `SELECT key, fetched_at, retry_after FROM tiles WHERE key IN (${placeholders})`
+        `SELECT key, fetched_at, retry_after, error FROM tiles WHERE key IN (${placeholders})`
       )
       .bind(...group)
-      .all<{ key: string; fetched_at: number; retry_after: number }>();
+      .all<{
+        key: string;
+        fetched_at: number;
+        retry_after: number;
+        error: string | null;
+      }>();
 
     (results || []).forEach(row =>
       states.set(row.key, {
         key: row.key,
         fetchedAt: row.fetched_at,
-        retryAfter: row.retry_after
+        retryAfter: row.retry_after,
+        error: row.error
       })
     );
   }

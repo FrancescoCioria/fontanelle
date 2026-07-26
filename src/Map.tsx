@@ -32,6 +32,7 @@ import {
   CLUSTER_RADIUS
 } from "./mapIcons";
 import Toast from "./Toast";
+import DataStatus from "./DataStatus";
 import { useAppStore } from "./store";
 
 import "./map.scss";
@@ -83,6 +84,8 @@ function MapFountains() {
   const setIsAddMenuOpen = useAppStore(s => s.setIsAddMenuOpen);
   const errorMessage = useAppStore(s => s.errorMessage);
   const setErrorMessage = useAppStore(s => s.setErrorMessage);
+  const setDataStatus = useAppStore(s => s.setDataStatus);
+  const setRetryLastSearch = useAppStore(s => s.setRetryLastSearch);
 
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const nodesRef = useRef<{ [id: string]: OpenStreetMapNode }>({});
@@ -233,28 +236,55 @@ function MapFountains() {
       // already sits inside fresh data or needs a new fetch.
       searchedCenterRef.current = { lat: c.lat, lng: c.lng };
 
+      // don't let the previous area's verdict sit over the new one
+      if (retry === 0) setDataStatus(null);
+
       if (loadingBarRef.current) {
         // @ts-ignore (continuousStart args are optional)
         loadingBarRef.current.continuousStart();
       }
+
+      // let the banner offer a retry for exactly this search
+      setRetryLastSearch(() => updateAmenitiesFnRef.current(c, 0));
 
       getOpenStreetMapAmenities({
         around: aroundRef.current,
         lat: c.lat,
         lng: c.lng
       })
-        .then(({ nodes, partial }) => {
+        .then(({ nodes, partial, tiles }) => {
           addAmenitiesMarkers(nodes);
 
-          if (partial && retry < PARTIAL_RETRY_DELAYS_MS.length) {
+          const willRetry = partial && retry < PARTIAL_RETRY_DELAYS_MS.length;
+
+          if (willRetry) {
             partialRetryTimerRef.current = setTimeout(() => {
               partialRetryTimerRef.current = null;
               updateAmenitiesFnRef.current(c, retry + 1);
             }, PARTIAL_RETRY_DELAYS_MS[retry]);
           }
+
+          // ⚠️ The order matters: an unreachable tile outranks everything, and
+          // "nothing here" is claimed ONLY when the server says the whole area
+          // is fresh — otherwise a slow load reads as an empty neighbourhood,
+          // which is the confusion this banner exists to remove.
+          if (tiles.unreachable > 0) {
+            setDataStatus({
+              kind: "unreachable",
+              retrying: willRetry,
+              hasData: nodes.length > 0
+            });
+          } else if (partial) {
+            // quiet while there is something to look at: the top loading bar
+            // already says we're working
+            setDataStatus(nodes.length > 0 ? null : { kind: "loading" });
+          } else {
+            setDataStatus(nodes.length > 0 ? null : { kind: "empty" });
+          }
         })
         .catch(e => {
           if (e instanceof DOMException && e.name === "AbortError") return;
+          setDataStatus({ kind: "offline" });
           setErrorMessage("Failed to load amenities. Please try again.");
         })
         .finally(() => {
@@ -708,6 +738,8 @@ function MapFountains() {
           );
         })}
       </div>
+
+      <DataStatus />
 
       {openedNode && <BottomSheet />}
 

@@ -2,6 +2,18 @@ import { create } from "zustand";
 import type { OpenStreetMapNode, Amenity } from "./getOpenStreetMapAmenities";
 import type { UpsertNode } from "./UpsertNode";
 
+/**
+ * What the map can honestly say about the area currently on screen.
+ * ⚠️ `empty` is a claim, not a shrug: only set when the server reports every
+ * tile covering the area as fresh. Everything less certain gets its own kind.
+ */
+export type DataStatus =
+  | { kind: "loading" }
+  | { kind: "unreachable"; retrying: boolean; hasData: boolean }
+  | { kind: "offline" }
+  | { kind: "empty" }
+  | null;
+
 type AppState = {
   openedNode: OpenStreetMapNode | null;
   upsertNode: UpsertNode | null;
@@ -13,6 +25,9 @@ type AppState = {
   filters: { [k in Amenity]: boolean };
   showRadius: boolean;
   continousSearch: boolean;
+  dataStatus: DataStatus;
+  /** Set by Map so the status banner can offer a retry without prop drilling. */
+  retryLastSearch: (() => void) | null;
 
   setOpenedNode: (node: OpenStreetMapNode | null) => void;
   setUpsertNode: (node: UpsertNode | null) => void;
@@ -24,6 +39,8 @@ type AppState = {
   setFilter: (amenity: Amenity, value: boolean) => void;
   setShowRadius: (show: boolean) => void;
   setContinousSearch: (v: boolean) => void;
+  setDataStatus: (status: DataStatus) => void;
+  setRetryLastSearch: (fn: (() => void) | null) => void;
 };
 
 export const useAppStore = create<AppState>(set => ({
@@ -46,6 +63,8 @@ export const useAppStore = create<AppState>(set => ({
   },
   showRadius: true,
   continousSearch: false,
+  dataStatus: null,
+  retryLastSearch: null,
 
   setOpenedNode: node => set({ openedNode: node }),
   setUpsertNode: node => set({ upsertNode: node }),
@@ -58,5 +77,7 @@ export const useAppStore = create<AppState>(set => ({
   setFilter: (amenity, value) =>
     set(state => ({ filters: { ...state.filters, [amenity]: value } })),
   setShowRadius: show => set({ showRadius: show }),
-  setContinousSearch: v => set({ continousSearch: v })
+  setContinousSearch: v => set({ continousSearch: v }),
+  setDataStatus: status => set({ dataStatus: status }),
+  setRetryLastSearch: fn => set({ retryLastSearch: fn })
 }));

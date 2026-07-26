@@ -142,17 +142,21 @@ export const onRequestGet: PagesFunction<Env> = async context => {
     tiles.map(t => t.key)
   );
 
-  // Three buckets, and the difference matters to the client: `held` tiles are
-  // someone else's job (or cooling down) — reporting them as done would stop
-  // the client retrying while their data is still on its way.
+  // Buckets, and the differences all reach the user interface:
+  //  - `held`    someone else is fetching it right now → "still loading"
+  //  - `cooling` it just failed and is backing off     → "OSM is unreachable"
+  // ⚠️ Collapsing those two is what left the app saying "loading…" forever
+  // while Overpass was down, which reads exactly like an empty area.
   const allStale: Tile[] = [];
   let held = 0;
+  let cooling = 0;
 
   tiles.forEach(tile => {
     const state = states.get(tile.key);
 
     if (state && state.retryAfter > startedAt) {
-      held++;
+      if (state.error) cooling++;
+      else held++;
       return;
     }
 
@@ -241,10 +245,14 @@ export const onRequestGet: PagesFunction<Env> = async context => {
   // `partial` means "ask again in a moment", never "error": the answer already
   // carries every tile that did land.
   const inFlight = stale.length - fetched - failed;
-  const partial = inFlight > 0 || failed > 0 || held > 0 || deferred > 0;
+  // `unreachable` is the honest count of tiles we currently cannot get: ones we
+  // just failed on, plus ones still cooling down from an earlier failure.
+  const unreachable = failed + cooling;
+  const partial =
+    inFlight > 0 || unreachable > 0 || held > 0 || deferred > 0;
 
   console.log(
-    `[amenities] lat=${lat.toFixed(4)} lon=${lon.toFixed(4)} r=${around} tiles=${tiles.length} stale=${allStale.length} held=${held} fetched=${fetched} failed=${failed} deferred=${deferred} skipped=${skipped} nodes=${nodes.length} partial=${partial} ms=${Date.now() - startedAt}`
+    `[amenities] lat=${lat.toFixed(4)} lon=${lon.toFixed(4)} r=${around} tiles=${tiles.length} stale=${allStale.length} held=${held} cooling=${cooling} fetched=${fetched} failed=${failed} deferred=${deferred} skipped=${skipped} nodes=${nodes.length} partial=${partial} ms=${Date.now() - startedAt}`
   );
 
   return json({
@@ -257,6 +265,8 @@ export const onRequestGet: PagesFunction<Env> = async context => {
       held,
       fetched,
       failed,
+      cooling,
+      unreachable,
       deferred,
       inFlight
     }

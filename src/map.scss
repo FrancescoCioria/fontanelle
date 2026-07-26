@@ -420,6 +420,34 @@ svg {
 }
 
 // === Toast ===
+// Sits just under the filter pills: the one place that says whether an empty
+// map means "nothing is mapped here" or "OpenStreetMap didn't answer".
+.data-status {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  max-width: 88vw;
+  padding: 8px 16px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: $shadow-md;
+  background: $surface;
+  color: $text-secondary;
+  animation: slideUp 0.25s ease;
+
+  // a failure is not the same news as an empty field, and must not look like it
+  &--unreachable,
+  &--offline {
+    background: #fef3c7;
+    color: #92400e;
+  }
+}
+
 .toast {
   position: fixed;
   bottom: 80px;
