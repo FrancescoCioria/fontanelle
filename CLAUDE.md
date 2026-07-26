@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `yarn typecheck` — Both projects: browser (`tsconfig.json`) and Functions (`functions/tsconfig.json`)
 - `yarn db:init` / `yarn db:init:remote` — Apply `schema.sql` to the local / remote D1
 - `yarn deploy` — Deploy to Cloudflare Pages (static build **and** Functions)
+- `yarn logs` — Last 30 write events from the D1 audit log (`audit_events`)
 
 Uses Vite with `vite-plugin-pwa` for service worker generation. ⚠️ No Node polyfills: `vite-plugin-node-polyfills` went out with `xml2js` (the write path builds its own XML server-side) — it was an always-loaded ~200 KiB chunk nothing referenced. Verified by grepping the built bundle for `Buffer`/`process`/`stream`; don't re-add it without that check.
 
@@ -79,6 +80,15 @@ Authenticated users can create, update, and delete OSM nodes. **Write path is no
 - `validate()` repeats the editable-amenity gate server-side: the endpoint is reachable without the add menu, and `amenity=playground` means nothing in OSM.
 - XML is hand-built with `escapeXml` rather than pulling in a builder — the grammar is four attributes and a flat tag list, and every value is user text (`Bar "Le Rêve" & co` in `operator` must not produce a malformed changeset). Removing `xml2js` also took it out of the browser bundle.
 - Errors forward OSM's own status and message (409 version conflict, 401 expired token); `UpsertNode` shows it instead of "please try again", which on a 409 would just loop.
+
+**Write log (`audit_events`, `functions/lib/audit.ts`)** — every attempted mutation is recorded: `node.created` / `node.updated` / `node.deleted`, and `node.<action>_failed` with OSM's own status and message. Read it with `yarn logs`.
+
+- ⚠️ **Append-only, and nothing reads it to decide anything.** State lives in `nodes`/`tiles`; this is history for a human. Reading it to drive logic is the line between "CRUD + event logging" and event sourcing — stay on this side.
+- It exists because `console.log` in a Pages Function is only visible to a `wrangler tail` attached *at that moment*: real user edits left nothing to inspect afterwards.
+- Actor is a **snapshot** (OSM uid + display name at the time, from `/api/0.6/user/details.json`), and there is no FK to `nodes` — the event has to outlive the object and the rename.
+- `recordEvent` is best-effort and never awaited into the failure path: the mutation happened on a remote server, so it can't be atomic with the log, and losing a log line must not turn a successful edit into an error.
+- ⚠️ Only *authenticated, validated* attempts are logged. 400/401 rejections are not, or an unauthenticated POST loop could inflate the table at will.
+- `whoami` fails fast on 401 **before** the changeset is opened — a changeset that can never be filled is litter on OSM. Other errors there only cost the actor's name.
 
 `BottomSheet`'s single-node refresh still reads `openstreetmap.org` directly, best-effort (`.catch(() => {})`) — it's a read, and that host is reliable.
 

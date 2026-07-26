@@ -1,4 +1,5 @@
 import { editableAmenities, normalizeElement } from "../../shared/amenities";
+import { AuditActor, recordEvent } from "../lib/audit";
 import { deleteNode, upsertNode } from "../lib/store";
 
 /**
@@ -162,6 +163,36 @@ const validate = (
   return { action, id: id as number | null, lat, lon, tags };
 };
 
+/**
+ * Who is holding this token, asked of OSM itself. One extra call per write,
+ * and worth it twice over: the audit log gets a real actor snapshot instead of
+ * "someone", and an expired token fails here — before a changeset is opened —
+ * with a message that says so.
+ */
+const whoami = async (token: string): Promise<AuditActor> => {
+  try {
+    const raw = await osmFetch(token, "GET", "/api/0.6/user/details.json");
+    const { user } = JSON.parse(raw) as {
+      user?: { id?: number; display_name?: string };
+    };
+
+    return user?.id
+      ? {
+          type: "osm_user",
+          id: String(user.id),
+          name: user.display_name || "?"
+        }
+      : { type: "unknown" };
+  } catch (e) {
+    // A dead token is worth stopping for: opening a changeset that can never be
+    // filled leaves litter on OSM. Anything else (a blip on this one endpoint)
+    // is not worth failing an otherwise valid edit over — we just lose the name.
+    if (e instanceof OsmError && e.status === 401) throw e;
+
+    return { type: "unknown" };
+  }
+};
+
 const currentVersion = async (token: string, id: number): Promise<number> => {
   const raw = await osmFetch(token, "GET", `/api/0.6/node/${id}.json`);
   const { elements } = JSON.parse(raw) as {
@@ -194,8 +225,14 @@ export const onRequestPost: PagesFunction<Env> = async context => {
 
   const { action, lat, lon, tags } = parsed;
   const db = context.env.DB;
+  const startedAt = Date.now();
+  const verb = { create: "created", update: "updated", delete: "deleted" }[action];
+  // outside the try so the failure path can still name whoever it managed to
+  let actor: AuditActor = { type: "unknown" };
 
   try {
+    actor = await whoami(token);
+
     const comment = `${
       action === "create" ? "Add" : action === "update" ? "Update" : "Delete"
     } "${tags.amenity}" amenity`;
@@ -252,6 +289,21 @@ export const onRequestPost: PagesFunction<Env> = async context => {
       await deleteNode(db, `node/${id}`);
       console.log(`[osm] delete node/${id} ok (changeset ${changesetId})`);
 
+      await recordEvent(db, {
+        action: `node.${verb}`,
+        actor,
+        subjectType: "node",
+        subjectId: `node/${id}`,
+        metadata: {
+          changeset: changesetId,
+          lat,
+          lon,
+          amenity: tags.amenity,
+          ms: Date.now() - startedAt
+        },
+        request: context.request
+      });
+
       return json({ node: { id, lat, lon, tags, elementType: "node" } });
     }
 
@@ -273,12 +325,46 @@ export const onRequestPost: PagesFunction<Env> = async context => {
     await upsertNode(db, stored, Date.now());
     console.log(`[osm] ${action} node/${id} ok (changeset ${changesetId})`);
 
+    await recordEvent(db, {
+      action: `node.${verb}`,
+      actor,
+      subjectType: "node",
+      subjectId: `node/${id}`,
+      metadata: {
+        changeset: changesetId,
+        lat: stored.lat,
+        lon: stored.lon,
+        amenity: stored.tags.amenity,
+        // the tags OSM confirmed, not the ones the client proposed
+        tags: stored.tags,
+        ms: Date.now() - startedAt
+      },
+      request: context.request
+    });
+
     return json({ node: stored });
   } catch (e) {
     const status = e instanceof OsmError ? e.status : 502;
     const message = (e as Error).message || String(e);
 
     console.log(`[osm] ${action} FAILED: ${message}`);
+
+    // a failed edit is the one you most want a record of later
+    await recordEvent(db, {
+      action: `node.${action}_failed`,
+      actor,
+      subjectType: "node",
+      subjectId: parsed.id ? `node/${parsed.id}` : null,
+      metadata: {
+        lat,
+        lon,
+        amenity: tags.amenity,
+        status,
+        error: message.slice(0, 500),
+        ms: Date.now() - startedAt
+      },
+      request: context.request
+    });
 
     return json({ error: message }, status === 401 ? 401 : status);
   }

@@ -28,3 +28,26 @@ CREATE TABLE IF NOT EXISTS nodes (
 -- live in the next one over.
 CREATE INDEX IF NOT EXISTS nodes_lat_lon ON nodes (lat, lon);
 CREATE INDEX IF NOT EXISTS nodes_tile ON nodes (tile);
+
+-- Append-only write log. ⚠️ NEVER read to decide anything — enforcement and
+-- state live in the tables above; this is history, for a human, after the fact.
+-- Exists because console.log on Pages Functions is only visible to a `tail`
+-- running at that very moment: real edits left no trace to inspect later.
+CREATE TABLE IF NOT EXISTS audit_events (
+  id           TEXT PRIMARY KEY,
+  occurred_at  INTEGER NOT NULL,   -- epoch ms
+  action       TEXT NOT NULL,      -- namespaced verb: "node.created", "node.update_failed"
+  actor_type   TEXT NOT NULL,      -- "osm_user" | "unknown"
+  actor_id     TEXT,               -- OSM uid
+  actor_name   TEXT,               -- SNAPSHOT: OSM display name at the time
+  subject_type TEXT NOT NULL,      -- "node"
+  subject_id   TEXT,               -- "node/123"; NULL when a create never got an id
+  metadata     TEXT NOT NULL DEFAULT '{}', -- JSON: changeset, tags, coords, error…
+  ip           TEXT,
+  user_agent   TEXT
+);
+
+-- no FK to `nodes`: the event must outlive the object it talks about
+CREATE INDEX IF NOT EXISTS audit_events_time_idx ON audit_events (occurred_at);
+CREATE INDEX IF NOT EXISTS audit_events_subject_idx ON audit_events (subject_type, subject_id, occurred_at);
+CREATE INDEX IF NOT EXISTS audit_events_actor_idx ON audit_events (actor_id, occurred_at);

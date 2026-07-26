@@ -74,6 +74,9 @@ yarn build && yarn deploy
 Il token Mapbox è anche un secret di Cloudflare Pages (`VITE_MAPBOX_TOKEN`).
 Le tabelle sul database di produzione si creano con `yarn db:init:remote`.
 
+Le modifiche fatte dagli utenti (riuscite e fallite) restano registrate: si
+leggono con `yarn logs`.
+
 > ⚠️ Il deploy va fatto su `fontanelle.pages.dev` e non altrove: il
 > `redirect_uri` OAuth di OpenStreetMap è registrato su quel dominio, quindi su
 > qualsiasi altro host il login OSM non funziona.
