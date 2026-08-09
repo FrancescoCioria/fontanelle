@@ -2,11 +2,11 @@
 
 Mappa delle risorse pubbliche all'aperto, basata su OpenStreetMap: fontanelle,
 bagni pubblici, docce, bagni pubblici storici, stazioni di riparazione bici,
-punti di ricarica, parchi giochi e aree picnic.
+punti di ricarica, parchi giochi, aree picnic e ascensori pubblici.
 
 Il nome è storico — è nata per le sole fontanelle, oggi copre l'outdoor in
 generale, con un occhio a chi gira con bambini (parchi giochi, aree picnic,
-bagni col fasciatoio).
+bagni col fasciatoio, ascensori per il passeggino).
 
 **Live: https://fontanelle.pages.dev**
 
@@ -87,9 +87,9 @@ I dati vengono da OpenStreetMap, quindi non c'è un database da correggere: si
 modifica OSM. Con un account OSM si possono aggiungere e modificare i punti
 direttamente dall'app, e la modifica finisce su OSM per tutti.
 
-I parchi giochi e le aree picnic sono in sola lettura nell'app, perché OSM li
-cataloga sotto chiavi (`leisure`, `tourism`) che la parte di scrittura non sa
-ancora gestire.
+I parchi giochi, le aree picnic e gli ascensori sono in sola lettura nell'app,
+perché OSM li cataloga sotto chiavi (`leisure`, `tourism`, `highway`) che la
+parte di scrittura non sa ancora gestire.
 
 ## Note tecniche
 

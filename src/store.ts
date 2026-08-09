@@ -59,7 +59,8 @@ export const useAppStore = create<AppState>(set => ({
     public_bath: true,
     device_charging_station: true,
     playground: true,
-    picnic: true
+    picnic: true,
+    elevator: true
   },
   showRadius: true,
   continousSearch: false,

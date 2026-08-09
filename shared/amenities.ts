@@ -69,6 +69,23 @@ export type AmenityTags = { mapillary?: string } & (
       lit?: "yes" | "no";
       indoor?: "yes" | "no";
     }
+  // OSM tags lifts as `highway=elevator`, not `amenity=*` — another
+  // pseudo-amenity, see `PSEUDO_AMENITIES`
+  | {
+      amenity: "elevator";
+      name?: string;
+      ref?: string;
+      operator?: string;
+      access?: "yes" | "public" | "permissive" | "unknown" | "private";
+      wheelchair?: "yes" | "no" | "unknown" | "limited";
+      fee?: "yes" | "no" | "unknown";
+      charge?: string;
+      opening_hours?: string;
+      // the floors it serves, e.g. `0;-1`. Free text: OSM writes lists
+      // (`-3;-2;-1;0`), so don't narrow it to a number
+      level?: string;
+      indoor?: "yes" | "no";
+    }
   // `leisure=picnic_table` (one table) and `tourism=picnic_site` (the area
   // around them), normalized together — see `PSEUDO_AMENITIES`
   | {
@@ -101,7 +118,13 @@ export const PSEUDO_AMENITIES: {
   // a picnic site is the area, a picnic table the furniture in it — the same
   // place to someone looking for somewhere to eat outdoors
   { key: "leisure", value: "picnic_table", amenity: "picnic" },
-  { key: "tourism", value: "picnic_site", amenity: "picnic" }
+  { key: "tourism", value: "picnic_site", amenity: "picnic" },
+  // ⚠️ 86% of lifts are plain nodes (taginfo, 2026-08-09: 48.8k of 56.9k), so
+  // unlike the two above this one is read-only by *policy*, not by shape: the
+  // write path serializes `amenity=<value>`, and `amenity=elevator` means
+  // nothing in OSM. Making them editable means teaching `osm.ts` to write the
+  // real key/value pair, not moving this entry out of the table.
+  { key: "highway", value: "elevator", amenity: "elevator" }
 ];
 
 const PSEUDO_AMENITY_NAMES: Amenity[] = PSEUDO_AMENITIES.map(
@@ -116,7 +139,8 @@ const amenitiesMap: { [k in Amenity]: Amenity } = {
   bicycle_repair_station: "bicycle_repair_station",
   device_charging_station: "device_charging_station",
   playground: "playground",
-  picnic: "picnic"
+  picnic: "picnic",
+  elevator: "elevator"
 };
 
 export const amenities = Object.values(amenitiesMap);

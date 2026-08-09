@@ -78,7 +78,8 @@ const amenitiesMapOrder: { [k in Amenity]: number } = {
   device_charging_station: 5,
   bicycle_repair_station: 6,
   playground: 7,
-  picnic: 8
+  picnic: 8,
+  elevator: 9
 };
 
 function MapFountains() {
@@ -740,7 +741,8 @@ function MapFountains() {
     public_bath: { label: "Baths", color: "#ec4899" },
     device_charging_station: { label: "Charging", color: "#eab308" },
     playground: { label: "Playgrounds", color: "#f43f5e" },
-    picnic: { label: "Picnic", color: "#92400e" }
+    picnic: { label: "Picnic", color: "#92400e" },
+    elevator: { label: "Elevators", color: "#475569" }
   };
 
   return (

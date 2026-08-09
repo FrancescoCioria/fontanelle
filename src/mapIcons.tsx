@@ -7,6 +7,7 @@ import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
 import PicnicMarker from "./PicnicMarker";
+import ElevatorMarker from "./ElevatorMarker";
 import {
   Amenity,
   AmenityTags,
@@ -112,6 +113,10 @@ export async function registerMapIcons(map: mapboxgl.Map): Promise<void> {
       `playground-${color}`,
       renderIcon(<PlaygroundMarker size={ICON_SIZE} color={color} />)
     ]);
+    svgEntries.push([
+      `elevator-${color}`,
+      renderIcon(<ElevatorMarker size={ICON_SIZE} color={color} />)
+    ]);
   }
 
   await Promise.all(
@@ -135,6 +140,7 @@ export function getIconName(tags: AmenityTags): string {
     case "public_bath":
     case "playground":
     case "picnic":
+    case "elevator":
       return `${tags.amenity}-${getAmenityColor(tags)}`;
   }
 }
