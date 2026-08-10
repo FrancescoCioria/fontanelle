@@ -1,4 +1,10 @@
-import { editableAmenities, normalizeElement } from "../../shared/amenities";
+import {
+  Amenity,
+  editableAmenities,
+  normalizeElement,
+  osmTagFor,
+  toOsmTags
+} from "../../shared/amenities";
 import { AuditActor, recordEvent } from "../lib/audit";
 import { deleteNode, upsertNode } from "../lib/store";
 
@@ -143,9 +149,10 @@ const validate = (
   const amenity = rawTags.amenity;
 
   // ⚠️ The same gate the add menu applies client-side, repeated here because
-  // this endpoint is reachable without it. Playgrounds and picnic sites live
-  // under `leisure`/`tourism`; writing `amenity=playground` would put a tag
-  // into OSM that means nothing to anybody.
+  // this endpoint is reachable without it. It is not about `amenity=*` being
+  // the only writable shape — a playground goes out as `leisure=playground`,
+  // see `toOsmTags` — but about refusing anything whose OSM spelling this app
+  // cannot name for certain, such as `picnic` (two tags, one amenity).
   if (
     typeof amenity !== "string" ||
     !(editableAmenities as string[]).includes(amenity)
@@ -193,15 +200,45 @@ const whoami = async (token: string): Promise<AuditActor> => {
   }
 };
 
-const currentVersion = async (token: string, id: number): Promise<number> => {
+const currentNode = async (
+  token: string,
+  id: number
+): Promise<{ version: number; tags: Record<string, string> }> => {
   const raw = await osmFetch(token, "GET", `/api/0.6/node/${id}.json`);
   const { elements } = JSON.parse(raw) as {
-    elements: { version: number }[];
+    elements: { version: number; tags?: Record<string, string> }[];
   };
 
   if (!elements?.[0]) throw new OsmError(404, `node/${id} not found`);
 
-  return elements[0].version;
+  return { version: elements[0].version, tags: elements[0].tags || {} };
+};
+
+/**
+ * The tag set to send to OSM, given what the app holds and what OSM holds now.
+ *
+ * ⚠️ The `current` argument exists for one narrow case, and it is a case of
+ * silent data loss. A node can carry a pseudo-amenity's key *and* an unrelated
+ * `amenity` (real: `leisure=playground` + `amenity=traffic_park`).
+ * `normalizeElement` folds it to `amenity: "playground"` and the foreign value
+ * is gone from the app's model — so writing the model straight back would
+ * delete somebody else's tag from OSM without anyone noticing. Rare, not
+ * hypothetical: 12 of Italy's 10,457 playground nodes, measured 2026-08-10.
+ * The app cannot represent that tag, so it does not get a vote on it: whatever
+ * OSM has stays.
+ */
+export const tagsForOsm = (
+  tags: Record<string, string>,
+  current?: Record<string, string>
+): Record<string, string> => {
+  const osmTags = toOsmTags(tags);
+  const displaced = current?.amenity;
+
+  if (osmTagFor(tags.amenity as Amenity) && displaced) {
+    osmTags.amenity = displaced;
+  }
+
+  return osmTags;
 };
 
 export const onRequestPost: PagesFunction<Env> = async context => {
@@ -233,9 +270,15 @@ export const onRequestPost: PagesFunction<Env> = async context => {
   try {
     actor = await whoami(token);
 
+    // name the tag actually written, not the app's internal one: a changeset
+    // reading `"playground" amenity` describes a tag that doesn't exist
+    const pseudo = osmTagFor(tags.amenity as Amenity);
+
     const comment = `${
       action === "create" ? "Add" : action === "update" ? "Update" : "Delete"
-    } "${tags.amenity}" amenity`;
+    } ${
+      pseudo ? `${pseudo.key}=${pseudo.value}` : `"${tags.amenity}" amenity`
+    }`;
 
     const changesetId = await osmFetch(
       token,
@@ -254,7 +297,7 @@ export const onRequestPost: PagesFunction<Env> = async context => {
           token,
           "PUT",
           "/api/0.6/node/create",
-          nodeXml({ changeset: changesetId, lat, lon }, tags)
+          nodeXml({ changeset: changesetId, lat, lon }, tagsForOsm(tags))
         );
 
         id = parseInt(created, 10);
@@ -263,15 +306,21 @@ export const onRequestPost: PagesFunction<Env> = async context => {
           throw new OsmError(502, `OSM returned no node id ("${created}")`);
         }
       } else {
-        const version = await currentVersion(token, id!);
-        const attributes = { changeset: changesetId, id: id!, lat, lon, version };
+        const current = await currentNode(token, id!);
+        const attributes = {
+          changeset: changesetId,
+          id: id!,
+          lat,
+          lon,
+          version: current.version
+        };
 
         await osmFetch(
           token,
           action === "update" ? "PUT" : "DELETE",
           `/api/0.6/node/${id}`,
           action === "update"
-            ? nodeXml(attributes, tags)
+            ? nodeXml(attributes, tagsForOsm(tags, current.tags))
             : nodeXml(attributes)
         );
       }

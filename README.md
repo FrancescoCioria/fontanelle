@@ -87,9 +87,14 @@ I dati vengono da OpenStreetMap, quindi non c'è un database da correggere: si
 modifica OSM. Con un account OSM si possono aggiungere e modificare i punti
 direttamente dall'app, e la modifica finisce su OSM per tutti.
 
-I parchi giochi, le aree picnic e gli ascensori sono in sola lettura nell'app,
-perché OSM li cataloga sotto chiavi (`leisure`, `tourism`, `highway`) che la
-parte di scrittura non sa ancora gestire.
+Si può modificare solo ciò che su OSM è un singolo punto. I parchi giochi
+disegnati come area — la maggioranza — si vedono ma non si toccano da qui: per
+quelli serve un editor vero come iD o JOSM.
+
+Le aree picnic e gli ascensori restano in sola lettura anche quando sono punti.
+Gli ascensori è solo questione di abilitarli; le aree picnic no, perché OSM le
+cataloga in due modi diversi (`leisure=picnic_table` per il tavolo,
+`tourism=picnic_site` per l'area) e l'app non può indovinare quale intendevi.
 
 ## Note tecniche
 

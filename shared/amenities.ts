@@ -113,19 +113,72 @@ export const PSEUDO_AMENITIES: {
   key: string;
   value: string;
   amenity: Amenity;
+  /**
+   * The app may create and edit this one. ⚠️ Only ever set where the amenity
+   * maps to a *single* key/value pair: writing back is the inverse of the
+   * folding done in `normalizeElement`, and an amenity with two spellings has
+   * no inverse — see `picnic` below.
+   */
+  writable?: boolean;
 }[] = [
-  { key: "leisure", value: "playground", amenity: "playground" },
+  // 44% of Italian playgrounds are plain nodes (Overpass, 2026-08-10: 10,457
+  // nodes against 13,343 ways), so a node is an ordinary way to map one, not a
+  // second-class shape. Areas stay read-only: `isEditable` gates on the element
+  // type, not on this flag.
+  {
+    key: "leisure",
+    value: "playground",
+    amenity: "playground",
+    writable: true
+  },
   // a picnic site is the area, a picnic table the furniture in it — the same
-  // place to someone looking for somewhere to eat outdoors
+  // place to someone looking for somewhere to eat outdoors.
+  // ⚠️ Precisely because two tags fold into one amenity, this one cannot be
+  // written back: nothing in `amenity: "picnic"` says which of the two the user
+  // meant. Making it writable means asking them, not guessing here.
   { key: "leisure", value: "picnic_table", amenity: "picnic" },
   { key: "tourism", value: "picnic_site", amenity: "picnic" },
   // ⚠️ 86% of lifts are plain nodes (taginfo, 2026-08-09: 48.8k of 56.9k), so
-  // unlike the two above this one is read-only by *policy*, not by shape: the
-  // write path serializes `amenity=<value>`, and `amenity=elevator` means
-  // nothing in OSM. Making them editable means teaching `osm.ts` to write the
-  // real key/value pair, not moving this entry out of the table.
+  // this one is read-only by *policy*, not by shape — flipping `writable` is
+  // all it would take now that the write path serializes the real pair.
   { key: "highway", value: "elevator", amenity: "elevator" }
 ];
+
+/**
+ * The OSM key/value an app amenity is actually stored under, or undefined when
+ * it is a plain `amenity=*` (or a pseudo-amenity we refuse to write).
+ *
+ * ⚠️ The inverse of the folding in `normalizeElement`, and the reason the write
+ * path can touch a playground at all: `amenity=playground` means nothing to
+ * anybody in OSM, `leisure=playground` is the tag.
+ */
+export const osmTagFor = (
+  amenity: Amenity
+): { key: string; value: string } | undefined => {
+  const writable = PSEUDO_AMENITIES.filter(
+    p => p.amenity === amenity && p.writable
+  );
+
+  // two spellings, no inverse — refuse rather than pick one
+  return writable.length === 1 ? writable[0] : undefined;
+};
+
+/**
+ * App tag set → the tags OSM stores. ⚠️ Every write goes through this: the rest
+ * of the app discriminates on one `amenity` field, and that field is a fiction
+ * for anything in `PSEUDO_AMENITIES`.
+ */
+export const toOsmTags = (tags: {
+  [k: string]: string;
+}): { [k: string]: string } => {
+  const pseudo = osmTagFor(tags.amenity as Amenity);
+
+  if (!pseudo) return { ...tags };
+
+  const { amenity: _fictional, ...rest } = tags;
+
+  return { ...rest, [pseudo.key]: pseudo.value };
+};
 
 const PSEUDO_AMENITY_NAMES: Amenity[] = PSEUDO_AMENITIES.map(
   p => p.amenity
@@ -146,12 +199,12 @@ const amenitiesMap: { [k in Amenity]: Amenity } = {
 export const amenities = Object.values(amenitiesMap);
 
 /**
- * Pseudo-amenities are read-only: they live under a key other than `amenity`
- * (`leisure`, `tourism`), which the OSM write path (`osm.ts`) can't serialize
- * back — it would write `amenity=playground`, which means nothing in OSM.
+ * A pseudo-amenity is writable only when it declares the one key/value pair the
+ * write path should serialize. Without that the app would write
+ * `amenity=playground` — a tag that means nothing to anybody in OSM.
  */
 const isEditableAmenity = (amenity: Amenity) =>
-  !PSEUDO_AMENITY_NAMES.includes(amenity);
+  !PSEUDO_AMENITY_NAMES.includes(amenity) || !!osmTagFor(amenity);
 
 /** Amenities the user can add from the app. */
 export const editableAmenities = amenities.filter(isEditableAmenity);
