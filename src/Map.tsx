@@ -262,13 +262,26 @@ function MapFountains() {
       // don't let the previous area's verdict sit over the new one
       if (retry === 0) setDataStatus(null);
 
-      if (loadingBarRef.current) {
+      // ⚠️ Only on a fresh search: a retry round is a continuation of the same
+      // fill and the bar is still running from the previous one. Restarting it
+      // there would throw the progress back to ~15% each round (the library
+      // does not guard against a second continuousStart), which reads as
+      // "starting over" rather than "still going".
+      if (retry === 0 && loadingBarRef.current) {
         // @ts-ignore (continuousStart args are optional)
         loadingBarRef.current.continuousStart();
       }
 
       // let the banner offer a retry for exactly this search
       setRetryLastSearch(() => updateAmenitiesFnRef.current(c, 0));
+
+      // ⚠️ The bar has to stay up across the *whole* fill, retries included, not
+      // just while a request is on the wire. Between rounds this reply is
+      // answered but the work is not done — the server is still fetching tiles
+      // behind it — and a bar that finishes there says "this is everything",
+      // over a map that is still missing pieces. Waiting is fine as long as the
+      // app is honest that it is still working.
+      let stillWorking = false;
 
       getOpenStreetMapAmenities({
         around: aroundRef.current,
@@ -279,6 +292,7 @@ function MapFountains() {
           addAmenitiesMarkers(nodes);
 
           const willRetry = partial && retry < PARTIAL_RETRY_DELAYS_MS.length;
+          stillWorking = willRetry;
 
           if (willRetry) {
             partialRetryTimerRef.current = setTimeout(() => {
@@ -322,6 +336,10 @@ function MapFountains() {
           setErrorMessage("Failed to load amenities. Please try again.");
         })
         .finally(() => {
+          // a retry is queued for this same area: leave the bar running, the
+          // next round picks it up where this one left it
+          if (stillWorking) return;
+
           if (loadingBarRef.current) {
             loadingBarRef.current.complete();
           }
