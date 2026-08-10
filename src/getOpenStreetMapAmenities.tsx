@@ -39,6 +39,14 @@ export type Options = {
   around: number;
   lat: number;
   lng: number;
+  /**
+   * What the map is currently showing, `south,west,north,east`. ⚠️ Separate
+   * from `around` on purpose: the radius says how far the server should go and
+   * fetch, this says how much of what it already has to send back. Tying the
+   * two together meant the basemap drew toilet and fountain symbols across a
+   * screen where the app drew pins only inside a small disc.
+   */
+  bbox?: string;
 };
 
 // Bumped when the cached shape changes: v1 entries predate `elementType`, so
@@ -200,7 +208,8 @@ export default async (options: Options): Promise<AmenitiesResponse> => {
   const params = new URLSearchParams({
     lat: String(options.lat),
     lon: String(options.lng),
-    radius: String(options.around)
+    radius: String(options.around),
+    ...(options.bbox ? { bbox: options.bbox } : {})
   });
 
   try {

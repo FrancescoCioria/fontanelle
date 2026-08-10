@@ -222,20 +222,25 @@ function MapFountains() {
   function updateCachedAmenities(center?: { lat: number; lng: number }) {
     getMap(map => {
       const c = center ?? map.getCenter();
+      const bounds = map.getBounds();
 
       localforage.getItem<OpenStreetMapNode[]>(CACHE_KEY).then(items => {
         if (items) {
-          const nodesInRadius = items.filter(node => {
-            const distanceInMeters = distance(
-              [c.lng, c.lat],
-              [node.lon, node.lat],
-              { units: "meters" }
-            );
+          // ⚠️ On screen OR inside the searched circle — not the circle alone.
+          // The saved copy is there to put something under the user's eyes
+          // instantly; clipping it to the radius left four fifths of the map
+          // blank while the answer was already on the device.
+          const visible = items.filter(node => {
+            if (bounds.contains([node.lon, node.lat])) return true;
 
-            return distanceInMeters < aroundRef.current;
+            return (
+              distance([c.lng, c.lat], [node.lon, node.lat], {
+                units: "meters"
+              }) < aroundRef.current
+            );
           });
 
-          addAmenitiesMarkers(nodesInRadius);
+          addAmenitiesMarkers(visible);
         }
       });
     });
@@ -283,10 +288,18 @@ function MapFountains() {
       // app is honest that it is still working.
       let stillWorking = false;
 
+      const bounds = map.getBounds();
+
       getOpenStreetMapAmenities({
         around: aroundRef.current,
         lat: c.lat,
-        lng: c.lng
+        lng: c.lng,
+        bbox: [
+          bounds.getSouth(),
+          bounds.getWest(),
+          bounds.getNorth(),
+          bounds.getEast()
+        ].join(",")
       })
         .then(({ nodes, partial, tiles }) => {
           addAmenitiesMarkers(nodes);
