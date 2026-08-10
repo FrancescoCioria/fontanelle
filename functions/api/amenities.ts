@@ -34,8 +34,28 @@ type Env = { DB: D1Database };
 /** OSM amenities move at the speed of civil engineering. */
 const TILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** How long a tile stays claimed by the request that is fetching it. */
-const CLAIM_MS = 90 * 1000;
+/**
+ * How long a claim keeps others off a tile — deliberately far shorter than the
+ * work it covers, because it is **renewed while that work is alive** (see the
+ * heartbeat below). It is therefore a liveness lease, not a duration estimate.
+ *
+ * ⚠️ The number that matters here is how long a *dead* claim blackens the map.
+ * A claim outlives its worker whenever the connection drops inside the response
+ * budget — a phone losing signal, an app sent to the background — and Cloudflare
+ * then kills the invocation with no chance to record anything. That state is
+ * invisible: no error, so nothing counts as `unreachable`; the tile just answers
+ * "someone is fetching me" while nobody is. Measured 2026-08-10 on the live D1:
+ * of 21 tiles, 5 sat at `fetched_at = 0` with `error IS NULL` — abandoned, not
+ * failed — and one of those predated any testing, straight from real use.
+ */
+const CLAIM_MS = 25 * 1000;
+
+/**
+ * How often a live fetch re-stamps its claim. ⚠️ Must stay comfortably under
+ * CLAIM_MS or a slow-but-healthy fetch loses its own tile to a second request.
+ * A dead worker stops beating — that is the whole mechanism.
+ */
+const CLAIM_HEARTBEAT_MS = 10 * 1000;
 
 /** Breather after a failed tile, so a bad Overpass day isn't a hammering loop. */
 const FAILURE_COOLDOWN_MS = 30 * 1000;
@@ -186,6 +206,15 @@ export const onRequestGet: PagesFunction<Env> = async context => {
       return;
     }
 
+    // ⚠️ Renews the claim for as long as this invocation is alive. Timers only
+    // fire inside a running invocation, which is exactly the property wanted:
+    // the moment Cloudflare kills us — the client's connection dropped mid
+    // request — the beating stops and the lease runs out on its own, instead of
+    // holding the tile dark for the length of the longest fetch imaginable.
+    const heartbeat = setInterval(() => {
+      claimTile(db, tile.key, Date.now() + CLAIM_MS).catch(() => undefined);
+    }, CLAIM_HEARTBEAT_MS);
+
     try {
       await claimTile(db, tile.key, Date.now() + CLAIM_MS);
 
@@ -197,6 +226,10 @@ export const onRequestGet: PagesFunction<Env> = async context => {
         .map(normalizeElement)
         .filter((n): n is OpenStreetMapNode => n !== null);
 
+      // ⚠️ Before writeTile, not after: writeTile clears retry_after, and a beat
+      // landing behind it would re-lock a tile that is already done.
+      clearInterval(heartbeat);
+
       await writeTile(db, tile, nodes, Date.now(), result.dataTimestamp);
       fetched++;
 
@@ -204,6 +237,8 @@ export const onRequestGet: PagesFunction<Env> = async context => {
         `[amenities] tile ${tile.key} ok: ${nodes.length}/${result.elements.length} nodes in ${result.ms}ms via ${result.endpoint} (attempt ${result.attempts}, data lag ${result.dataTimestamp ? Math.round((Date.now() - result.dataTimestamp) / 1000) + 's' : 'unknown'})`
       );
     } catch (e) {
+      clearInterval(heartbeat);
+
       failed++;
       const message = (e as Error).message || String(e);
       console.log(`[amenities] tile ${tile.key} FAILED: ${message}`);
