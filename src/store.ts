@@ -8,7 +8,14 @@ import type { UpsertNode } from "./UpsertNode";
  * tile covering the area as fresh. Everything less certain gets its own kind.
  */
 export type DataStatus =
-  | { kind: "loading" }
+  /**
+   * Part of the area on screen has not been fetched yet. ⚠️ Shown even when
+   * there are already markers, and that is the point: a tile the server hasn't
+   * answered for yet is a slice of map with nothing on it, and next to a
+   * neighbourhood full of pins it reads as "nothing here" rather than "not
+   * loaded". The map cannot make that distinction visible; only this can.
+   */
+  | { kind: "incomplete"; retrying: boolean; hasData: boolean }
   | { kind: "unreachable"; retrying: boolean; hasData: boolean }
   | { kind: "offline" }
   | { kind: "empty" }

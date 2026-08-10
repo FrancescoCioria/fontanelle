@@ -222,6 +222,20 @@ export const onRequestGet: PagesFunction<Env> = async context => {
 
   // ⚠️ Not `await`: the point is that the tiles still in flight keep going and
   // land in D1 after this response, ready for the client's next call.
+  //
+  // ⚠️ It protects them only once the response is out, and moving this line
+  // above the race does not change that — measured against production
+  // 2026-08-10, three cases:
+  //  - client disconnects *after* the reply → work survives, tiles land (~25s);
+  //  - browser `AbortController` on a live HTTP/2 connection → also survives:
+  //    it resets one stream, not the connection, so the Function is untouched;
+  //  - the connection itself dropping inside the budget above (phone losing
+  //    signal, app backgrounded) → the invocation is killed outright, and the
+  //    tiles it had already claimed stay claimed for CLAIM_MS with nobody
+  //    flying them. Every request over that area then answers `held` — "still
+  //    loading" — for a minute and a half, over a slice of map with no pins.
+  // A dead claim is indistinguishable from a live one here; the only bound on
+  // it is CLAIM_MS.
   context.waitUntil(work);
 
   const inBBox = await readNodesInBBox(db, radiusBBox(lat, lon, around));

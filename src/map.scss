@@ -442,7 +442,8 @@ svg {
 
   // a failure is not the same news as an empty field, and must not look like it
   &--unreachable,
-  &--offline {
+  &--offline,
+  &--stalled {
     background: #fef3c7;
     color: #92400e;
   }

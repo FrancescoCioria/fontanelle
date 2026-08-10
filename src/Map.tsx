@@ -298,9 +298,20 @@ function MapFountains() {
               hasData: nodes.length > 0
             });
           } else if (partial) {
-            // quiet while there is something to look at: the top loading bar
-            // already says we're working
-            setDataStatus(nodes.length > 0 ? null : { kind: "loading" });
+            // ⚠️ Say it even when markers are already on screen. This used to go
+            // quiet on the grounds that the top loading bar covers it — but the
+            // bar is only up while a request is in flight, and between retries
+            // that is a gap of up to a minute. Meanwhile a tile that hasn't
+            // answered is a slice of the map with no pins on it, sitting next to
+            // a full one: indistinguishable from empty countryside, which is the
+            // whole complaint. A z12 tile takes 8–11s in a city against a 6s
+            // budget (measured 2026-08-10), so this is the *normal* first answer
+            // over anywhere new, not a rare edge.
+            setDataStatus({
+              kind: "incomplete",
+              retrying: willRetry,
+              hasData: nodes.length > 0
+            });
           } else {
             setDataStatus(nodes.length > 0 ? null : { kind: "empty" });
           }

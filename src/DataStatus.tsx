@@ -17,12 +17,22 @@ const DataStatus = () => {
 
   if (!status) return null;
 
-  const retryable = status.kind === "unreachable" || status.kind === "offline";
+  const retryable =
+    status.kind === "unreachable" ||
+    status.kind === "offline" ||
+    (status.kind === "incomplete" && !status.retrying);
 
   const message = (): string => {
     switch (status.kind) {
-      case "loading":
-        return "Loading this area…";
+      case "incomplete":
+        // ⚠️ Deliberately loud about *which* part is unknown. "Loading…" over a
+        // map that already shows pins invites the reading "loaded, and that's
+        // all there is" — which is exactly the confusion being fixed.
+        return status.retrying
+          ? status.hasData
+            ? "Still loading — parts of this area aren't shown yet"
+            : "Loading this area…"
+          : "Parts of this area never loaded. Tap to retry.";
       case "unreachable":
         return status.hasData
           ? status.retrying
@@ -40,7 +50,12 @@ const DataStatus = () => {
 
   return (
     <div
-      className={`data-status data-status--${status.kind}`}
+      className={`data-status data-status--${status.kind}${
+        // still trying is news; given up is a problem, and looks like one
+        status.kind === "incomplete" && !status.retrying
+          ? " data-status--stalled"
+          : ""
+      }`}
       role="status"
       onClick={() => {
         if (retryable) retry?.();
