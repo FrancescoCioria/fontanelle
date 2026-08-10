@@ -3,7 +3,7 @@ import {
   editableAmenities,
   normalizeElement,
   osmTagFor,
-  PSEUDO_AMENITIES,
+  readSpelling,
   toOsmTags
 } from "../../shared/amenities";
 import { AuditActor, recordEvent } from "../lib/audit";
@@ -218,44 +218,49 @@ const currentNode = async (
 /**
  * The tag set to send to OSM, given what the app holds and what OSM holds now.
  *
- * ⚠️ The `current` argument is there because the app's model is lossy, and
- * writing a lossy model straight back deletes other people's data. Two cases,
- * both silent, both real:
- *  - a node can carry a pseudo-amenity's key *and* an unrelated `amenity`
- *    (`leisure=playground` + `amenity=traffic_park`); the fold drops the
- *    foreign value, so saving would erase it — 12 of Italy's 10,457 playground
- *    nodes, measured 2026-08-10;
- *  - one amenity can fold in from several tags, and we write only one of them
- *    back: a `tourism=picnic_site` node would come out as
- *    `leisure=picnic_table`, retyping an area as a bench.
- * Same rule answers both: what the app cannot represent, it does not get a
- * vote on. Whatever OSM already holds stays.
+ * ⚠️ One rule, because the app's model is lossy in three different ways and
+ * writing it back blind destroys other people's data every time:
+ * **whatever spelling the object already has, it keeps.** The app squeezes
+ * every object into a single `amenity` field; OSM does not, and an edit to a
+ * fee must never change what kind of object something is.
+ *
+ * What that saves, all of it real and all of it silent:
+ *  - `leisure=playground` + `amenity=traffic_park` — the fold drops the foreign
+ *    `amenity`, so saving would erase it (12 of Italy's 10,457 playground
+ *    nodes, 2026-08-10);
+ *  - a `tourism=picnic_site` node would come back `leisure=picnic_table`,
+ *    retyping an area as a single bench;
+ *  - an `amenity=fountain` we show as drinking water would come back
+ *    `amenity=drinking_water`, retyping a monument as a tap.
+ *
+ * `current` is what OSM returns for the node, already fetched for its version,
+ * so this costs no extra call.
  */
 export const tagsForOsm = (
   tags: Record<string, string>,
   current?: Record<string, string>
 ): Record<string, string> => {
   const osmTags = toOsmTags(tags);
-  const pseudo = osmTagFor(tags.amenity as Amenity);
 
-  if (!pseudo || !current) return osmTags;
+  if (!current) return osmTags;
 
-  if (current.amenity) osmTags.amenity = current.amenity;
+  const amenity = tags.amenity as Amenity;
+  const ours = osmTagFor(amenity);
+  const theirs = readSpelling(current);
+  const sameThing = theirs !== null && theirs.amenity === amenity;
 
-  // ⚠️ Keep the spelling this object already has. One amenity can fold in from
-  // several tags — `picnic` reads from both `leisure=picnic_table` and
-  // `tourism=picnic_site` — and only one of them is what we write for *new*
-  // objects. Rewriting on update would silently retype somebody's picnic area
-  // as a single table because its fee was edited: the app cannot tell the two
-  // apart after `normalizeElement`, so it must not choose for an object that
-  // already answered the question.
-  const existing = PSEUDO_AMENITIES.find(
-    p => p.amenity === tags.amenity && current[p.key] === p.value
-  );
+  // The `amenity` key is ours to set only when our own spelling uses it *and*
+  // the object isn't already spelled some other way. Otherwise it is theirs,
+  // whatever it holds — including nothing.
+  if (ours || (sameThing && theirs.kind !== "amenity")) {
+    delete osmTags.amenity;
+    if (current.amenity) osmTags.amenity = current.amenity;
+  }
 
-  if (existing && existing.value !== pseudo.value) {
-    delete osmTags[pseudo.key];
-    osmTags[existing.key] = existing.value;
+  // One amenity, several pseudo spellings: keep the one already on the object.
+  if (sameThing && theirs.kind === "pseudo" && ours && ours.value !== theirs.value) {
+    delete osmTags[ours.key];
+    osmTags[theirs.key] = theirs.value;
   }
 
   return osmTags;

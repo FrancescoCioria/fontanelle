@@ -238,6 +238,73 @@ export const isEditable = (node: OpenStreetMapNode): boolean =>
 const isKnownAmenity = (value?: string): value is Amenity =>
   !!value && (amenities as string[]).includes(value);
 
+/**
+ * Other people's spellings for things this app already has an amenity for.
+ *
+ * ⚠️ Not the same idea as `PSEUDO_AMENITIES`, which is about an amenity whose
+ * *only* OSM spelling lives under another key. These are alternatives: a
+ * drinking fountain is normally `amenity=drinking_water`, but plenty of them
+ * are an `amenity=fountain` you can drink from. The app was blind to all of
+ * them, and visibly so — the Mapbox basemap draws its `drinking-water` symbol
+ * on these, so the map showed an icon with no pin of ours under it. Measured in
+ * Italy 2026-08-10: 1,146 drinkable `amenity=fountain`, 189 `fountain=drinking`
+ * and 293 toilet blocks mapped only as `building=toilets`.
+ *
+ * ⚠️ **Conditional, hence a separate table**: `amenity=fountain` alone is a
+ * monument, not a drink. Every pair in `when` must match.
+ *
+ * ⚠️ **Never written.** These say how somebody else spelled it, not how we
+ * spell it — see `tagsForOsm`, which keeps an object's own spelling on save.
+ * Writing ours would retag a monumental fountain as a tap.
+ */
+export const ALSO_TAGGED_AS: {
+  when: { [k: string]: string };
+  amenity: Amenity;
+}[] = [
+  { when: { amenity: "fountain", drinking_water: "yes" }, amenity: "drinking_water" },
+  { when: { fountain: "drinking" }, amenity: "drinking_water" },
+  { when: { building: "toilets" }, amenity: "toilets" }
+];
+
+/**
+ * How a set of OSM tags spells one of our amenities, or null for something we
+ * don't render. ⚠️ One function, used both when reading Overpass and when
+ * deciding what to write back, so the two can't disagree about what an object
+ * already is.
+ */
+export type Spelling =
+  | { kind: "amenity"; amenity: Amenity }
+  | { kind: "pseudo"; amenity: Amenity; key: string; value: string }
+  | { kind: "alias"; amenity: Amenity; when: { [k: string]: string } };
+
+export const readSpelling = (tags: {
+  [k: string]: string;
+}): Spelling | null => {
+  // ⚠️ A supported `amenity` wins. Don't gate this on `!tags.amenity`:
+  // `way/583656299` is `leisure=playground` + `amenity=traffic_park`, and
+  // keeping the foreign value makes it vanish downstream *and* get cached.
+  if (isKnownAmenity(tags.amenity)) {
+    return { kind: "amenity", amenity: tags.amenity };
+  }
+
+  const pseudo = PSEUDO_AMENITIES.find(p => tags[p.key] === p.value);
+
+  if (pseudo) {
+    return {
+      kind: "pseudo",
+      amenity: pseudo.amenity,
+      key: pseudo.key,
+      value: pseudo.value
+    };
+  }
+
+  const alias = ALSO_TAGGED_AS.find(a =>
+    Object.keys(a.when).every(k => tags[k] === a.when[k])
+  );
+
+  return alias ? { kind: "alias", amenity: alias.amenity, when: alias.when } : null;
+};
+
 /** Overpass element as returned by `out center` (ways/relations have no lat/lon). */
 export type OverpassElement = {
   type: "node" | "way" | "relation";
@@ -256,29 +323,32 @@ export const normalizeElement = (
 
   if (!element.tags || lat === undefined || lon === undefined) return null;
 
-  // An `amenity` we support always wins; the pseudo key is the fallback.
-  // ⚠️ NOT `!element.tags.amenity`: a playground can carry an unrelated amenity
-  // (real case, way/583656299: `leisure=playground` + `amenity=traffic_park`),
-  // and keeping the foreign value makes it vanish downstream — and get cached
-  // that way. Conversely an `amenity=toilets` that also has a picnic table
-  // stays a toilet.
-  const pseudo = isKnownAmenity(element.tags.amenity)
-    ? undefined
-    : PSEUDO_AMENITIES.find(p => element.tags![p.key] === p.value);
+  const spelling = readSpelling(element.tags);
 
-  // ⚠️ Rewrite ONLY the key that actually matched. Tags dropped here are also
-  // dropped on save (osmUpdateNode replaces the whole tag set), so stripping
-  // `leisure` unconditionally would delete e.g. `leisure=sauna` from an
+  // never cache something we can't render: it would sit in the caches forever
+  if (!spelling) return null;
+
+  // ⚠️ Rewrite ONLY what has to change. Tags dropped here are also dropped on
+  // save (the write path replaces the whole tag set), so stripping `leisure`
+  // unconditionally would delete e.g. `leisure=sauna` from an
   // `amenity=public_bath` node the user merely edits the fee of.
   let tags = element.tags as AmenityTags;
 
-  if (pseudo) {
-    const { [pseudo.key]: _matched, ...rest } = element.tags;
-    tags = { ...rest, amenity: pseudo.amenity } as AmenityTags;
+  if (spelling.kind === "pseudo") {
+    const { [spelling.key]: _matched, ...rest } = element.tags;
+    tags = { ...rest, amenity: spelling.amenity } as AmenityTags;
   }
 
-  // never cache something we can't render: it would sit in the caches forever
-  if (!isKnownAmenity(tags.amenity)) return null;
+  if (spelling.kind === "alias") {
+    // ⚠️ This one *does* lose a tag — `amenity=fountain` becomes
+    // `amenity=drinking_water` in our model, because the rest of the app
+    // discriminates on that single field. The original is restored on save
+    // from what OSM still holds (`tagsForOsm`); losing it there would retype a
+    // monument as a tap. The condition tags (`drinking_water=yes`,
+    // `fountain=drinking`, `building=toilets`) are kept, so the object stays
+    // recognisable as itself.
+    tags = { ...element.tags, amenity: spelling.amenity } as AmenityTags;
+  }
 
   return { id: element.id, lat, lon, elementType: element.type, tags };
 };
@@ -309,12 +379,23 @@ export const overpassQuery = (bbox: {
         .join("|")})$"]${area};`
   );
 
+  // ⚠️ One branch per alias, with *all* its conditions: `amenity=fountain`
+  // on its own is a monument, and asking for it would flood the map with
+  // ornamental basins nobody can drink from.
+  const aliasBranches = ALSO_TAGGED_AS.map(
+    a =>
+      `nwr${Object.keys(a.when)
+        .map(k => `["${k}"="${a.when[k]}"]`)
+        .join("")}${area};`
+  );
+
   // ⚠️ `[timeout:*]` is not decoration: without it Overpass applies its own
   // default and a slow instance sits in the queue past our fetch deadline.
   return `[out:json][timeout:60];
 (
   nwr["amenity"~"^(${osmAmenities.join("|")})$"]${area};
   ${pseudoBranches.join("\n  ")}
+  ${aliasBranches.join("\n  ")}
 );
 out center;`;
 };

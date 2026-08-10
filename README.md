@@ -87,6 +87,11 @@ I dati vengono da OpenStreetMap, quindi non c'è un database da correggere: si
 modifica OSM. Con un account OSM si possono aggiungere e modificare i punti
 direttamente dall'app, e la modifica finisce su OSM per tutti.
 
+L'app riconosce anche le grafie alternative: una fontana da cui si beve
+(`amenity=fountain` + `drinking_water=yes`) compare tra le fontanelle, un blocco
+bagni mappato solo come `building=toilets` compare tra i bagni. Modificandoli,
+il loro tag originale resta: non li riscriviamo a modo nostro.
+
 Si può modificare solo ciò che su OSM è un singolo punto. I parchi giochi
 disegnati come area — la maggioranza — si vedono ma non si toccano da qui: per
 quelli serve un editor vero come iD o JOSM.
