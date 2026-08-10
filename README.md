@@ -91,9 +91,10 @@ Si può modificare solo ciò che su OSM è un singolo punto. I parchi giochi
 disegnati come area — la maggioranza — si vedono ma non si toccano da qui: per
 quelli serve un editor vero come iD o JOSM.
 
-Le aree picnic restano in sola lettura anche quando sono punti: OSM le cataloga
-in due modi diversi (`leisure=picnic_table` per il tavolo, `tourism=picnic_site`
-per l'area) e l'app non può indovinare quale intendevi.
+Un punto picnic aggiunto dall'app è sempre un **tavolo**
+(`leisure=picnic_table`), mai un'area: un'area disegnata come singolo punto
+sarebbe una mappa peggiore di nessun punto. Le aree picnic già esistenti si
+possono modificare e restano aree.
 
 ## Note tecniche
 

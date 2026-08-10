@@ -3,6 +3,7 @@ import {
   editableAmenities,
   normalizeElement,
   osmTagFor,
+  PSEUDO_AMENITIES,
   toOsmTags
 } from "../../shared/amenities";
 import { AuditActor, recordEvent } from "../lib/audit";
@@ -151,8 +152,8 @@ const validate = (
   // ⚠️ The same gate the add menu applies client-side, repeated here because
   // this endpoint is reachable without it. It is not about `amenity=*` being
   // the only writable shape — a playground goes out as `leisure=playground`,
-  // see `toOsmTags` — but about refusing anything whose OSM spelling this app
-  // cannot name for certain, such as `picnic` (two tags, one amenity).
+  // see `toOsmTags` — but about refusing anything this app has no single OSM
+  // spelling for.
   if (
     typeof amenity !== "string" ||
     !(editableAmenities as string[]).includes(amenity)
@@ -217,25 +218,44 @@ const currentNode = async (
 /**
  * The tag set to send to OSM, given what the app holds and what OSM holds now.
  *
- * ⚠️ The `current` argument exists for one narrow case, and it is a case of
- * silent data loss. A node can carry a pseudo-amenity's key *and* an unrelated
- * `amenity` (real: `leisure=playground` + `amenity=traffic_park`).
- * `normalizeElement` folds it to `amenity: "playground"` and the foreign value
- * is gone from the app's model — so writing the model straight back would
- * delete somebody else's tag from OSM without anyone noticing. Rare, not
- * hypothetical: 12 of Italy's 10,457 playground nodes, measured 2026-08-10.
- * The app cannot represent that tag, so it does not get a vote on it: whatever
- * OSM has stays.
+ * ⚠️ The `current` argument is there because the app's model is lossy, and
+ * writing a lossy model straight back deletes other people's data. Two cases,
+ * both silent, both real:
+ *  - a node can carry a pseudo-amenity's key *and* an unrelated `amenity`
+ *    (`leisure=playground` + `amenity=traffic_park`); the fold drops the
+ *    foreign value, so saving would erase it — 12 of Italy's 10,457 playground
+ *    nodes, measured 2026-08-10;
+ *  - one amenity can fold in from several tags, and we write only one of them
+ *    back: a `tourism=picnic_site` node would come out as
+ *    `leisure=picnic_table`, retyping an area as a bench.
+ * Same rule answers both: what the app cannot represent, it does not get a
+ * vote on. Whatever OSM already holds stays.
  */
 export const tagsForOsm = (
   tags: Record<string, string>,
   current?: Record<string, string>
 ): Record<string, string> => {
   const osmTags = toOsmTags(tags);
-  const displaced = current?.amenity;
+  const pseudo = osmTagFor(tags.amenity as Amenity);
 
-  if (osmTagFor(tags.amenity as Amenity) && displaced) {
-    osmTags.amenity = displaced;
+  if (!pseudo || !current) return osmTags;
+
+  if (current.amenity) osmTags.amenity = current.amenity;
+
+  // ⚠️ Keep the spelling this object already has. One amenity can fold in from
+  // several tags — `picnic` reads from both `leisure=picnic_table` and
+  // `tourism=picnic_site` — and only one of them is what we write for *new*
+  // objects. Rewriting on update would silently retype somebody's picnic area
+  // as a single table because its fee was edited: the app cannot tell the two
+  // apart after `normalizeElement`, so it must not choose for an object that
+  // already answered the question.
+  const existing = PSEUDO_AMENITIES.find(
+    p => p.amenity === tags.amenity && current[p.key] === p.value
+  );
+
+  if (existing && existing.value !== pseudo.value) {
+    delete osmTags[pseudo.key];
+    osmTags[existing.key] = existing.value;
   }
 
   return osmTags;

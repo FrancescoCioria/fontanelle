@@ -131,12 +131,16 @@ export const PSEUDO_AMENITIES: {
     amenity: "playground",
     writable: true
   },
-  // a picnic site is the area, a picnic table the furniture in it — the same
-  // place to someone looking for somewhere to eat outdoors.
-  // ⚠️ Precisely because two tags fold into one amenity, this one cannot be
-  // written back: nothing in `amenity: "picnic"` says which of the two the user
-  // meant. Making it writable means asking them, not guessing here.
-  { key: "leisure", value: "picnic_table", amenity: "picnic" },
+  // A picnic site is the area, a picnic table the furniture in it — the same
+  // place to someone looking for somewhere to eat outdoors, two different
+  // objects to OSM. ⚠️ Only the table is writable, and that is a deliberate
+  // narrowing, not a default: someone dropping a pin from a phone is standing
+  // at a table, and an *area* drawn as a single point is a worse map than no
+  // point at all. So new picnic objects are always tables.
+  { key: "leisure", value: "picnic_table", amenity: "picnic", writable: true },
+  // ⚠️ Read-only here does NOT mean an existing site can't be edited: which
+  // spelling a node already carries is preserved on save (`tagsForOsm`), or
+  // editing the fee of a picnic site would quietly demote it to a table.
   { key: "tourism", value: "picnic_site", amenity: "picnic" },
   // 86% of lifts are plain nodes (taginfo, 2026-08-09: 48.8k of 56.9k), and
   // `highway=elevator` is a single unambiguous pair, so there is nothing left

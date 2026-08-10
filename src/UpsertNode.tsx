@@ -190,6 +190,58 @@ export const UpsertNodePopup = (props: Props) => {
           />
         )}
 
+        {node.tags.amenity === "picnic" && (
+          <Select
+            value={node.tags.covered}
+            label="Covered"
+            onChange={v => editNodeTag("covered", v)}
+            options={[
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" }
+            ]}
+          />
+        )}
+
+        {node.tags.amenity === "picnic" && (
+          <Select
+            value={node.tags.backrest}
+            label="Backrest"
+            onChange={v => editNodeTag("backrest", v)}
+            options={[
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" }
+            ]}
+          />
+        )}
+
+        {node.tags.amenity === "picnic" && (
+          <Select
+            value={node.tags.wheelchair}
+            label="Wheelchair"
+            onChange={v => editNodeTag("wheelchair", v)}
+            options={[
+              { value: "unknown", label: "Unknown" },
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" },
+              { value: "limited", label: "Limited" }
+            ]}
+          />
+        )}
+
+        {node.tags.amenity === "picnic" && (
+          <Select
+            value={node.tags.access === "public" ? "yes" : node.tags.access}
+            label="Access"
+            onChange={v => editNodeTag("access", v)}
+            options={[
+              { value: "unknown", label: "Unknown" },
+              { value: "yes", label: "Yes" },
+              { value: "permissive", label: "Permissive" },
+              { value: "private", label: "Private" }
+            ]}
+          />
+        )}
+
         {node.tags.amenity === "elevator" && (
           <Select
             value={node.tags.wheelchair}
@@ -259,7 +311,8 @@ export const UpsertNodePopup = (props: Props) => {
           node.tags.amenity === "shower" ||
           node.tags.amenity === "public_bath" ||
           node.tags.amenity === "playground" ||
-          node.tags.amenity === "elevator") && (
+          node.tags.amenity === "elevator" ||
+          node.tags.amenity === "picnic") && (
           <Select
             value={node.tags.fee}
             label="Fee"
@@ -276,7 +329,8 @@ export const UpsertNodePopup = (props: Props) => {
           node.tags.amenity === "shower" ||
           node.tags.amenity === "public_bath" ||
           node.tags.amenity === "playground" ||
-          node.tags.amenity === "elevator") &&
+          node.tags.amenity === "elevator" ||
+          node.tags.amenity === "picnic") &&
         node.tags.fee === "yes" ? (
           <Input
             value={node.tags.charge}
