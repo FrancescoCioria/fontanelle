@@ -85,14 +85,14 @@ export const UpsertNodePopup = (props: Props) => {
           }}
         />
 
-        {node.tags.amenity === "playground" && (
-          <Input
-            value={node.tags.name}
-            label="Name"
-            onChange={v => editNodeTag("name", v)}
-          />
-        )}
-
+        {/* ⚠️ No `name` field, deliberately. In OSM `name` is the proper name,
+            not a description, and 93% of playgrounds correctly have none
+            (Overpass 2026-08-10: 729 named of 10,457 Italian nodes). An empty
+            text box at the top of the form asks a question whose right answer
+            is silence, and the answers already in OSM show what gets typed
+            instead: 74 of those 729 are just "Parco giochi" / "Parchetto".
+            A real name still survives an edit — the write path sends the whole
+            tag set back, the form simply doesn't invite touching it. */}
         <Select
           value={node.tags.indoor}
           label="Indoor"
