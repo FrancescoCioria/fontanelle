@@ -138,10 +138,10 @@ export const PSEUDO_AMENITIES: {
   // meant. Making it writable means asking them, not guessing here.
   { key: "leisure", value: "picnic_table", amenity: "picnic" },
   { key: "tourism", value: "picnic_site", amenity: "picnic" },
-  // ⚠️ 86% of lifts are plain nodes (taginfo, 2026-08-09: 48.8k of 56.9k), so
-  // this one is read-only by *policy*, not by shape — flipping `writable` is
-  // all it would take now that the write path serializes the real pair.
-  { key: "highway", value: "elevator", amenity: "elevator" }
+  // 86% of lifts are plain nodes (taginfo, 2026-08-09: 48.8k of 56.9k), and
+  // `highway=elevator` is a single unambiguous pair, so there is nothing left
+  // to decide — unlike picnic above.
+  { key: "highway", value: "elevator", amenity: "elevator", writable: true }
 ];
 
 /**
