@@ -1,6 +1,7 @@
+import FeeBadge from "./FeeBadge";
 import statusColor from "./statusColor";
 
-export default (props: { color: string; size: number }) => (
+export default (props: { color: string; size: number; fee?: boolean }) => (
   <svg width={props.size} height={props.size} viewBox="0 0 100 100">
     <circle
       cx="50"
@@ -19,5 +20,7 @@ export default (props: { color: string; size: number }) => (
       <polygon points="54,46 84,46 69,80" />
       <rect x="63.5" y="20" width="11" height="28" />
     </g>
+
+    {props.fee && <FeeBadge />}
   </svg>
 );

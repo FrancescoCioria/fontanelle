@@ -304,9 +304,9 @@ export const UpsertNodePopup = (props: Props) => {
           />
         )}
 
-        {/* playground included: the marker paints gold on a fee and grey on a
-            restricted access, so a form that can't set them can't produce the
-            states the map already knows how to show */}
+        {/* playground included: the marker wears a coin on a fee and turns grey
+            on a restricted access, so a form that can't set them can't produce
+            the states the map already knows how to show */}
         {(node.tags.amenity === "toilets" ||
           node.tags.amenity === "shower" ||
           node.tags.amenity === "public_bath" ||

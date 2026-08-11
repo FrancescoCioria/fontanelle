@@ -1,6 +1,7 @@
+import FeeBadge from "./FeeBadge";
 import statusColor from "./statusColor";
 
-export default (props: { color: string; size: number }) => (
+export default (props: { color: string; size: number; fee?: boolean }) => (
   <svg width={props.size} height={props.size} viewBox="0 0 100 100">
     <circle cx="50" cy="50" r="48" fill={statusColor(props.color, "#f97316")} stroke="white" strokeWidth="3" />
     <g fill="white">
@@ -18,5 +19,7 @@ export default (props: { color: string; size: number }) => (
       {/* Knob */}
       <circle cx="33.5" cy="61" r="4" />
     </g>
+
+    {props.fee && <FeeBadge />}
   </svg>
 );

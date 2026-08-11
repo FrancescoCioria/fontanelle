@@ -269,16 +269,22 @@ export const getAmenityColor = (amenityTags: AmenityTags): string => {
       : null;
   };
 
-  const feeRequired = (): string | null => {
-    return "fee" in amenityTags &&
-      typeof amenityTags.fee === "string" &&
-      amenityTags.fee !== "no"
-      ? "gold"
-      : null;
-  };
-
-  return closed() || notPublic() || feeRequired() || "white";
+  return closed() || notPublic() || "white";
 };
+
+/**
+ * Whether this amenity charges — drawn as a coin badge (`FeeBadge`), never as
+ * a colour.
+ *
+ * ⚠️ It used to return "gold" out of `getAmenityColor`, which made the fill
+ * carry three meanings at once and could only ever show one of them: a paid
+ * *and* closed toilet came out grey, with the price silently dropped. The two
+ * are independent facts, so they get independent channels.
+ */
+export const hasFee = (amenityTags: AmenityTags): boolean =>
+  "fee" in amenityTags &&
+  typeof amenityTags.fee === "string" &&
+  amenityTags.fee !== "no";
 
 export const getAmenityIcon = (amenity: Amenity, size: number): JSX.Element =>
   getAmenityMarker({ amenity } as AmenityTags, size);
@@ -288,6 +294,7 @@ export const getAmenityMarker = (
   size: number
 ): JSX.Element => {
   const color = getAmenityColor(amenityTags);
+  const fee = hasFee(amenityTags);
 
   switch (amenityTags.amenity) {
     case "drinking_water":
@@ -297,23 +304,24 @@ export const getAmenityMarker = (
         <PublicToiletsMarker
           size={size}
           color={color}
+          fee={fee}
           changingTable={amenityTags.changing_table === "yes"}
         />
       );
     case "shower":
-      return <PublicShowerMarker size={size} color={color} />;
+      return <PublicShowerMarker size={size} color={color} fee={fee} />;
     case "bicycle_repair_station":
       return <BicycleRepairStationMarker size={size} />;
     case "public_bath":
-      return <PublicBathMarker size={size} color={color} />;
+      return <PublicBathMarker size={size} color={color} fee={fee} />;
     case "device_charging_station":
       return <DeviceChargingStationMarker size={size} />;
     case "playground":
-      return <PlaygroundMarker size={size} color={color} />;
+      return <PlaygroundMarker size={size} color={color} fee={fee} />;
     case "picnic":
-      return <PicnicMarker size={size} color={color} />;
+      return <PicnicMarker size={size} color={color} fee={fee} />;
     case "elevator":
-      return <ElevatorMarker size={size} color={color} />;
+      return <ElevatorMarker size={size} color={color} fee={fee} />;
   }
 };
 

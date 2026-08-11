@@ -1,9 +1,11 @@
+import FeeBadge from "./FeeBadge";
 import statusColor from "./statusColor";
 
 export default (props: {
   color: string;
   size: number;
   changingTable?: boolean;
+  fee?: boolean;
 }) => {
   const background = statusColor(props.color, "#8b5cf6");
 
@@ -34,6 +36,8 @@ export default (props: {
           </g>
         </>
       )}
+
+      {props.fee && <FeeBadge />}
     </svg>
   );
 };
