@@ -1,5 +1,12 @@
 # Piano di Refactor — Fontanelle
 
+> **Chiuso: tutti e 7 i punti sono Done.** Documento storico, tenuto per il
+> perché delle scelte — non è una lista di cose da fare, e le descrizioni del
+> codice qui dentro fotografano il febbraio 2026, non com'è oggi. Esempio: i
+> «marker con colore dinamico (opening hours, fee, access)» citati ai punti 2 e
+> 3 oggi non esistono più così — il fee è un badge (`FeeBadge.tsx`), non un
+> colore. Per lo stato attuale vale [CLAUDE.md](./CLAUDE.md).
+
 ## 1. Error handling sulle chiamate API
 **Stato: Done**
 
