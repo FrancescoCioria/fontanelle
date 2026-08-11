@@ -11,8 +11,10 @@
  * The gold is the one the fill used to be (#eab308), so the palette didn't
  * change — only which channel carries the price.
  *
- * ⚠️ Top-right, because the toilets' changing-table badge owns the
- * bottom-right and the two show up together.
+ * ⚠️ Bottom-right. The toilets' changing-table badge used to sit there and
+ * moved to the top-right to make room, because the two show up together on the
+ * same toilet — whichever corner the coin takes, the other badge takes the
+ * other one.
  * ⚠️ Sized to survive ~24px, the size markers actually render at: solid disc
  * with a white ring first, € second. At 24px it reads as "this one has
  * something extra" and the glyph resolves on zoom — the same bet the baby
@@ -24,12 +26,12 @@
  */
 export default () => (
   <>
-    <circle cx="78" cy="22" r="20.4" fill="white" />
-    <circle cx="78" cy="22" r="17" fill="#eab308" />
+    <circle cx="78" cy="78" r="20.4" fill="white" />
+    <circle cx="78" cy="78" r="17" fill="#eab308" />
     {/* the €, drawn around its own origin and then dropped on the coin's
         centre: the disc's position lives in one place, not in every path */}
     <g
-      transform="translate(78 22) scale(0.85)"
+      transform="translate(78 78) scale(0.85)"
       fill="none"
       stroke="white"
       strokeWidth="4.5"

@@ -26,13 +26,15 @@ export default (props: {
       </g>
 
       {/* Baby badge for changing_table=yes. At marker size it reads simply as
-          "this one has something extra"; the shape resolves when zoomed. */}
+          "this one has something extra"; the shape resolves when zoomed.
+          ⚠️ Top-right: it sat bottom-right until the coin took that corner
+          (2026-08-11), and a paid toilet with a changing table wears both. */}
       {props.changingTable && (
         <>
-          <circle cx="76" cy="76" r="22" fill="white" stroke={background} strokeWidth="3" />
+          <circle cx="76" cy="24" r="22" fill="white" stroke={background} strokeWidth="3" />
           <g fill={background}>
-            <circle cx="76" cy="68" r="6" />
-            <rect x="68" y="76" width="16" height="12" rx="5" />
+            <circle cx="76" cy="16" r="6" />
+            <rect x="68" y="24" width="16" height="12" rx="5" />
           </g>
         </>
       )}
