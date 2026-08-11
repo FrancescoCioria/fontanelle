@@ -1,5 +1,6 @@
 import {
   OpenStreetMapNode,
+  RADIUS_MARGIN,
   normalizeElement,
   overpassQuery
 } from "../../shared/amenities";
@@ -12,7 +13,6 @@ import {
   writeTile
 } from "../lib/store";
 import {
-  BBox,
   Tile,
   distanceMeters,
   radiusBBox,
@@ -126,57 +126,6 @@ const number = (value: string | null): number | null => {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * The map's own bounds, `south,west,north,east`, when the client sends them.
- *
- * ⚠️ What the radius means: **how far to go and fetch**, not how much to show.
- * The two were the same thing and that was visible to users — the basemap draws
- * its own toilet and fountain symbols across the whole screen, while the app
- * drew pins only inside the searched disc. At the default 1km radius and the
- * opening zoom that disc is ~3 km² of a ~15 km² screen, so four fifths of the
- * map showed somebody else's POI symbols over none of ours. The rows were
- * mostly already in D1 and thrown away on the way out: measured 2026-08-10,
- * same Milan area, no fetching, 0.2s — 75 nodes at r=1000 against 506 at
- * r=3000.
- *
- * Clamped, because it arrives from the client: a bogus 180°-wide box would turn
- * every request into a full table scan.
- */
-const MAX_BBOX_DEGREES = 2;
-
-const viewport = (value: string | null, lat: number, lon: number): BBox | null => {
-  if (!value) return null;
-
-  const parts = value.split(",").map(Number);
-
-  if (parts.length !== 4 || parts.some(n => !Number.isFinite(n))) return null;
-
-  const [south, west, north, east] = parts;
-
-  // antimeridian-crossing boxes are not worth the branch: fall back to the disc
-  if (south >= north || west >= east) return null;
-
-  return {
-    south: Math.max(south, lat - MAX_BBOX_DEGREES),
-    north: Math.min(north, lat + MAX_BBOX_DEGREES),
-    west: Math.max(west, lon - MAX_BBOX_DEGREES),
-    east: Math.min(east, lon + MAX_BBOX_DEGREES)
-  };
-};
-
-const inBox = (node: { lat: number; lon: number }, box: BBox): boolean =>
-  node.lat >= box.south &&
-  node.lat <= box.north &&
-  node.lon >= box.west &&
-  node.lon <= box.east;
-
-const union = (a: BBox, b: BBox): BBox => ({
-  south: Math.min(a.south, b.south),
-  north: Math.max(a.north, b.north),
-  west: Math.min(a.west, b.west),
-  east: Math.max(a.east, b.east)
-});
-
 export const onRequestGet: PagesFunction<Env> = async context => {
   const url = new URL(context.request.url);
   const lat = number(url.searchParams.get("lat"));
@@ -196,7 +145,11 @@ export const onRequestGet: PagesFunction<Env> = async context => {
   }
 
   const around = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, radius));
-  const box = viewport(url.searchParams.get("bbox"), lat, lon);
+  // The circle the user asked for, plus a hair so nothing sits exactly on the
+  // edge. ⚠️ A `bbox` parameter used to widen this to the whole viewport; it is
+  // ignored now, deliberately, because clients cached by the service worker
+  // still send it — see RADIUS_MARGIN for what that cost.
+  const shown = around * RADIUS_MARGIN;
   const db = context.env.DB;
   const startedAt = Date.now();
 
@@ -326,18 +279,16 @@ export const onRequestGet: PagesFunction<Env> = async context => {
   // it is CLAIM_MS.
   context.waitUntil(work);
 
-  const searched = radiusBBox(lat, lon, around);
-  const rows = await readNodesInBBox(db, box ? union(searched, box) : searched);
+  const rows = await readNodesInBBox(db, radiusBBox(lat, lon, shown));
 
-  // Inside the circle we went and fetched, or inside the map the user is
-  // looking at: both are theirs. Still ordered by distance, so if MAX_NODES
-  // bites it is the far edge that goes.
+  // The box is the square around the circle, so the corners still have to go.
+  // Ordered by distance, so if MAX_NODES bites it is the far edge that goes.
   const withDistance = rows
     .map(node => ({
       node,
       d: distanceMeters({ lat, lon }, { lat: node.lat, lon: node.lon })
     }))
-    .filter(n => n.d <= around || (box !== null && inBox(n.node, box)))
+    .filter(n => n.d <= shown)
     .sort((a, b) => a.d - b.d);
 
   if (withDistance.length > MAX_NODES) {
@@ -358,7 +309,7 @@ export const onRequestGet: PagesFunction<Env> = async context => {
     inFlight > 0 || unreachable > 0 || held > 0 || deferred > 0;
 
   console.log(
-    `[amenities] lat=${lat.toFixed(4)} lon=${lon.toFixed(4)} r=${around}${box ? " +viewport" : ""} tiles=${tiles.length} stale=${allStale.length} held=${held} cooling=${cooling} fetched=${fetched} failed=${failed} deferred=${deferred} skipped=${skipped} nodes=${nodes.length} partial=${partial} ms=${Date.now() - startedAt}`
+    `[amenities] lat=${lat.toFixed(4)} lon=${lon.toFixed(4)} r=${around} tiles=${tiles.length} stale=${allStale.length} held=${held} cooling=${cooling} fetched=${fetched} failed=${failed} deferred=${deferred} skipped=${skipped} nodes=${nodes.length} partial=${partial} ms=${Date.now() - startedAt}`
   );
 
   return json({

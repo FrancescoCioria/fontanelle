@@ -8,6 +8,27 @@
  * render would cache it in D1 forever.
  */
 
+/**
+ * How far past the searched radius a point may sit and still be shown — a hair
+ * of slack on the edge of the circle, nothing more.
+ *
+ * ⚠️ Lives here because the server (deciding what to answer) and the browser
+ * (deciding what to draw out of its offline copy) must use the same number:
+ * two edges a few metres apart make points blink in and out on a pan.
+ *
+ * ⚠️ For one day (2026-08-10 → 08-11) the app instead showed everything inside
+ * the map's *viewport*, so the radius said "how far to fetch" and the screen
+ * said "how much to show". It fixed a real thing — the basemap draws its own
+ * fountain and toilet symbols across the whole screen, and ours stopped at the
+ * disc — but "the screen" has no upper bound: zoomed out over Bilbao it meant
+ * 5.942 points up to 167 km away, 817 KB, drawn from whatever anyone had ever
+ * searched. A map that claims a coverage it doesn't have is worse than one that
+ * admits it only looked where you asked. If the basemap symbols become a
+ * nuisance again, that gets solved for what it is — not by quietly widening the
+ * circle the user set.
+ */
+export const RADIUS_MARGIN = 1.05;
+
 export type AmenityTags = { mapillary?: string } & (
   | {
       amenity: "drinking_water";
