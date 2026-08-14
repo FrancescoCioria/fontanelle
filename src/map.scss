@@ -155,6 +155,10 @@ $transition: 0.2s ease;
   }
   transform: translateX(-50%);
   padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   background: $primary;
   color: $surface;
   font-size: 15px;
@@ -162,12 +166,26 @@ $transition: 0.2s ease;
   border-radius: 22px;
   box-shadow: $shadow-md;
   cursor: pointer;
-  transition: background $transition, transform $transition;
+  transition: background $transition, color $transition, transform $transition;
   -webkit-tap-highlight-color: transparent;
 
   &:active {
     background: $primary-dark;
     transform: translateX(-50%) scale(0.97);
+  }
+
+  // "This area is already searched" — a state, not a disabled button: it still
+  // searches, it just stops shouting for the tap.
+  &--covered {
+    background: $surface;
+    color: $text-secondary;
+    font-weight: 500;
+    box-shadow: $shadow-sm;
+
+    &:active {
+      background: $surface;
+      color: $text;
+    }
   }
 }
 

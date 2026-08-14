@@ -27,7 +27,12 @@ type AppState = {
   isMenuOpen: boolean;
   isAddMenuOpen: boolean;
   errorMessage: string | null;
-  showSearchThisAreaButton: boolean;
+  /**
+   * The map centre has drifted outside the area of the last search. ⚠️ This
+   * only picks the "search this area" button's *state* — the button itself is
+   * always on screen, so a re-search is never gated behind having moved.
+   */
+  isSearchAreaStale: boolean;
   around: number;
   filters: { [k in Amenity]: boolean };
   showRadius: boolean;
@@ -41,7 +46,7 @@ type AppState = {
   setIsMenuOpen: (isOpen: boolean) => void;
   setIsAddMenuOpen: (isOpen: boolean) => void;
   setErrorMessage: (msg: string | null) => void;
-  setShowSearchThisAreaButton: (show: boolean) => void;
+  setIsSearchAreaStale: (stale: boolean) => void;
   setAround: (around: number) => void;
   setFilter: (amenity: Amenity, value: boolean) => void;
   setShowRadius: (show: boolean) => void;
@@ -56,7 +61,7 @@ export const useAppStore = create<AppState>(set => ({
   isMenuOpen: false,
   isAddMenuOpen: false,
   errorMessage: null,
-  showSearchThisAreaButton: false,
+  isSearchAreaStale: false,
   around: 1000,
   filters: {
     drinking_water: true,
@@ -79,8 +84,7 @@ export const useAppStore = create<AppState>(set => ({
   setIsMenuOpen: isOpen => set({ isMenuOpen: isOpen }),
   setIsAddMenuOpen: isOpen => set({ isAddMenuOpen: isOpen }),
   setErrorMessage: msg => set({ errorMessage: msg }),
-  setShowSearchThisAreaButton: show =>
-    set({ showSearchThisAreaButton: show }),
+  setIsSearchAreaStale: stale => set({ isSearchAreaStale: stale }),
   setAround: around => set({ around }),
   setFilter: (amenity, value) =>
     set(state => ({ filters: { ...state.filters, [amenity]: value } })),

@@ -98,12 +98,8 @@ function MapFountains() {
   const setShowRadius = useAppStore(s => s.setShowRadius);
   const continousSearch = useAppStore(s => s.continousSearch);
   const setContinousSearch = useAppStore(s => s.setContinousSearch);
-  const showSearchThisAreaButton = useAppStore(
-    s => s.showSearchThisAreaButton
-  );
-  const setShowSearchThisAreaButton = useAppStore(
-    s => s.setShowSearchThisAreaButton
-  );
+  const isSearchAreaStale = useAppStore(s => s.isSearchAreaStale);
+  const setIsSearchAreaStale = useAppStore(s => s.setIsSearchAreaStale);
   const isAddMenuOpen = useAppStore(s => s.isAddMenuOpen);
   const setIsAddMenuOpen = useAppStore(s => s.setIsAddMenuOpen);
   const errorMessage = useAppStore(s => s.errorMessage);
@@ -261,8 +257,16 @@ function MapFountains() {
       // already sits inside fresh data or needs a new fetch.
       searchedCenterRef.current = { lat: c.lat, lng: c.lng };
 
-      // don't let the previous area's verdict sit over the new one
-      if (retry === 0) setDataStatus(null);
+      if (retry === 0) {
+        // ⚠️ Whoever asked for this search, this area is now the searched one —
+        // and this is the only place that says so, so the button's state can't
+        // disagree with what was actually fetched. A retry round is the *same*
+        // search continuing, and the user may have panned away meanwhile.
+        setIsSearchAreaStale(false);
+
+        // don't let the previous area's verdict sit over the new one
+        setDataStatus(null);
+      }
 
       // ⚠️ Only on a fresh search: a retry round is a continuation of the same
       // fill and the bar is still running from the previous one. Restarting it
@@ -403,14 +407,17 @@ function MapFountains() {
         );
 
         if (distanceInMeters > aroundRef.current / 2) {
+          // Say it either way: with continous search on, the fetch below clears
+          // the flag again as soon as it starts, so the button doesn't claim
+          // "covered" during the gap between the pan and the request.
+          setIsSearchAreaStale(true);
+
           if (continousSearchRef.current) {
             previousCenterRef.current = map.getCenter();
             updateAmenitiesFnRef.current();
-          } else {
-            setShowSearchThisAreaButton(true);
           }
         } else {
-          setShowSearchThisAreaButton(false);
+          setIsSearchAreaStale(false);
         }
       }, 800),
     []
@@ -528,10 +535,9 @@ function MapFountains() {
       if (insideSearched) return;
 
       // Baseline the move-debounce to the user's spot so the control's fly-to
-      // doesn't pop the "search this area" button on top of the fetch we're
-      // about to run.
+      // doesn't leave the button reading "stale" on top of the fetch we're
+      // about to run (which clears the flag itself).
       previousCenterRef.current = { lng: gps.lng, lat: gps.lat };
-      setShowSearchThisAreaButton(false);
       updateAmenitiesFnRef.current(gps);
     });
 
@@ -816,24 +822,46 @@ function MapFountains() {
 
       {openedNode && <BottomSheet />}
 
-      {showSearchThisAreaButton && openedNode === null && (
+      {/*
+        ⚠️ Always on screen; only the node sheet and the add/edit flow, which
+        own this strip themselves, take it away. It used to appear *only* after
+        panning half a radius away, which meant the one way to re-run a search
+        over the area you were already looking at was to pan off and come back.
+        Coverage is a **state** of the button, never a gate on it: the subdued
+        "Search again" says the area is done, and searches anyway when pressed.
+      */}
+      {openedNode === null && upsertNode === null && (
         <button
-          className="search-this-area-button"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}
+          className={`search-this-area-button${
+            isSearchAreaStale ? "" : " search-this-area-button--covered"
+          }`}
           onClick={() => {
             getMap(map => {
               previousCenterRef.current = map.getCenter();
               updateAmenities();
-
-              setShowSearchThisAreaButton(false);
             });
           }}
         >
-          Search this area
+          {isSearchAreaStale ? (
+            "Search this area"
+          ) : (
+            <>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Search again
+            </>
+          )}
         </button>
       )}
 
@@ -929,7 +957,6 @@ function MapFountains() {
           label="Enable continous search"
           onChange={cs => {
             setContinousSearch(cs);
-            setShowSearchThisAreaButton(false);
             localforage.setItem("continousSearch", cs);
           }}
         />
