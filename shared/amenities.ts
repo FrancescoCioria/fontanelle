@@ -25,7 +25,8 @@
  * searched. A map that claims a coverage it doesn't have is worse than one that
  * admits it only looked where you asked. If the basemap symbols become a
  * nuisance again, that gets solved for what it is — not by quietly widening the
- * circle the user set.
+ * circle the user set. (Done on 2026-08-18: `hideBasemapDuplicates` in
+ * `Map.tsx` drops the basemap's own icons for the categories we draw.)
  */
 export const RADIUS_MARGIN = 1.05;
 

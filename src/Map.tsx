@@ -83,6 +83,54 @@ const amenitiesMapOrder: { [k in Amenity]: number } = {
   elevator: 9
 };
 
+/**
+ * Maki icons the basemap draws for things this app draws itself.
+ *
+ * ⚠️ The style ("Outdoors", built 2019-01-04) rides on `mapbox-streets-v7`, a
+ * frozen tileset: its POIs are an OSM snapshot from ~2019, so it both misses
+ * everything mapped since and keeps objects at coordinates they have moved
+ * away from. Parco Trotter, Milan, 2026-08-18: the basemap drew a toilet 12m
+ * south of our pin — the same node (`5450827382`), at the position it had
+ * before it was moved on 2024-11-15. Two icons, one toilet, and the stale one
+ * is the one that can't be tapped.
+ *
+ * ⚠️ This is the fix CLAUDE.md points at for "the basemap draws its own
+ * symbols where our pins stop": hide *those symbols*, don't widen the radius
+ * the user set (tried 2026-08-10, reverted the next day).
+ *
+ * Only categories we render ourselves. `information`, `bicycle`,
+ * `bicycle-share`, `park`, `garden` and the rest stay: nothing of ours would
+ * take their place.
+ */
+const BASEMAP_MAKI_WE_DRAW = [
+  "toilet",
+  "drinking-water",
+  "picnic-site",
+  "playground"
+];
+
+/**
+ * ⚠️ By maki, across every `poi_label` layer — not by hiding one layer. The
+ * style spreads POIs over ten layers by scalerank, and each one mixes icons we
+ * duplicate with icons we don't: `poi-outdoor-features` carries toilets *and*
+ * information boards, `poi-parks-*` carries playgrounds *and* parks. Measured
+ * at the park on 2026-08-18: toilets and drinking water came from
+ * `poi-outdoor-features` there, but scalerank decides that per POI, not per
+ * category, so any of the ten can serve one on another screen.
+ */
+const hideBasemapDuplicates = (map: mapboxgl.Map) => {
+  const exclude = ["!in", "maki", ...BASEMAP_MAKI_WE_DRAW];
+
+  map
+    .getStyle()
+    .layers?.filter(layer => (layer as any)["source-layer"] === "poi_label")
+    .forEach(layer => {
+      const current = map.getFilter(layer.id);
+      // legacy filter syntax, like the rest of this 2019 style: don't mix
+      map.setFilter(layer.id, current ? ["all", current, exclude] : exclude);
+    });
+};
+
 function MapFountains() {
   const openedNode = useAppStore(s => s.openedNode);
   const setOpenedNode = useAppStore(s => s.setOpenedNode);
@@ -569,6 +617,8 @@ function MapFountains() {
     map.addControl(new mapboxgl.ScaleControl());
 
     map.on("load", async () => {
+      hideBasemapDuplicates(map);
+
       // ⚠️ mapRef is published only after the sources exist (below). Setting it
       // here would let updateGeoJsonSource run during the await and no-op on
       // missing sources, losing markers until the next pan.
