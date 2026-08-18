@@ -34,7 +34,7 @@ import {
 } from "./mapIcons";
 import Toast from "./Toast";
 import DataStatus from "./DataStatus";
-import { useAppStore } from "./store";
+import { loadFilters, useAppStore } from "./store";
 
 import "./map.scss";
 
@@ -94,6 +94,8 @@ function MapFountains() {
   const setAround = useAppStore(s => s.setAround);
   const filters = useAppStore(s => s.filters);
   const setFilter = useAppStore(s => s.setFilter);
+  const setFilters = useAppStore(s => s.setFilters);
+  const toggleOnlyFilter = useAppStore(s => s.toggleOnlyFilter);
   const showRadius = useAppStore(s => s.showRadius);
   const setShowRadius = useAppStore(s => s.setShowRadius);
   const continousSearch = useAppStore(s => s.continousSearch);
@@ -445,6 +447,8 @@ function MapFountains() {
     localforage
       .getItem<boolean>("continousSearch")
       .then(v => setContinousSearch(v || false));
+
+    loadFilters().then(setFilters);
 
     // initialize map
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -810,7 +814,22 @@ function MapFountains() {
                 color: active ? "#fff" : color,
                 backgroundColor: active ? color : "#fff"
               }}
-              onClick={() => setFilter(amenity, !active)}
+              /*
+                ⚠️ The double-tap window is the browser's, not ours: no timer,
+                no threshold. `dblclick` fires from a double tap too (measured
+                in Chromium touch emulation at both 80ms and 200ms gaps), and
+                `touch-action: manipulation` on the pill takes double-tap-zoom
+                out of its way. The two `click`s still fire first, so a
+                double-tap would otherwise toggle the pill off and back on
+                under the user's finger; `detail >= 2` is the browser telling
+                us the second one belongs to a double-tap, and we leave that
+                one to `onDoubleClick`.
+              */
+              onClick={e => {
+                if (e.detail >= 2) return;
+                setFilter(amenity, !active);
+              }}
+              onDoubleClick={() => toggleOnlyFilter(amenity)}
             >
               {label}
             </button>

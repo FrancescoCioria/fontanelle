@@ -100,6 +100,11 @@ $transition: 0.2s ease;
   -webkit-tap-highlight-color: transparent;
   white-space: nowrap;
   outline: none;
+  // Double-tap isolates the amenity, so the browser must deliver that gesture
+  // here instead of spending it on its own double-tap zoom. Safe on this one
+  // element: it is a 34px overlay button, and the map keeps its own gestures.
+  touch-action: manipulation;
+  user-select: none;
 
   &:active {
     transform: scale(0.95);

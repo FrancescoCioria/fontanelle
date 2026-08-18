@@ -1,6 +1,47 @@
 import { create } from "zustand";
+import localforage from "localforage";
+import { amenities } from "./getOpenStreetMapAmenities";
 import type { OpenStreetMapNode, Amenity } from "./getOpenStreetMapAmenities";
 import type { UpsertNode } from "./UpsertNode";
+
+type Filters = { [k in Amenity]: boolean };
+
+const FILTERS_KEY = "filters";
+
+const filtersWhere = (on: (amenity: Amenity) => boolean): Filters =>
+  Object.fromEntries(amenities.map(a => [a, on(a)])) as Filters;
+
+const allFiltersOn = () => filtersWhere(() => true);
+
+/**
+ * ⚠️ Saved filters are merged **over** the defaults, never used as-is: an
+ * amenity added to the app after the user last saved is absent from the stored
+ * object, and `undefined` reads as "off". It would be hidden on their map
+ * forever, with no error and nothing to click — the pill is on, the markers
+ * aren't. Unknown keys are dropped for the mirror-image reason.
+ */
+const hydrateFilters = (saved: unknown): Filters => {
+  const filters = allFiltersOn();
+  if (!saved || typeof saved !== "object") return filters;
+  for (const amenity of amenities) {
+    const value = (saved as Record<string, unknown>)[amenity];
+    if (typeof value === "boolean") filters[amenity] = value;
+  }
+  return filters;
+};
+
+/**
+ * Persistence lives here, not at the call sites, because two different actions
+ * now change the filters (toggle and isolate) and they must not be able to
+ * disagree about whether the result gets saved.
+ */
+const persist = (filters: Filters) => {
+  localforage.setItem(FILTERS_KEY, filters);
+  return filters;
+};
+
+export const loadFilters = () =>
+  localforage.getItem(FILTERS_KEY).then(hydrateFilters);
 
 /**
  * What the map can honestly say about the area currently on screen.
@@ -34,7 +75,7 @@ type AppState = {
    */
   isSearchAreaStale: boolean;
   around: number;
-  filters: { [k in Amenity]: boolean };
+  filters: Filters;
   showRadius: boolean;
   continousSearch: boolean;
   dataStatus: DataStatus;
@@ -49,6 +90,13 @@ type AppState = {
   setIsSearchAreaStale: (stale: boolean) => void;
   setAround: (around: number) => void;
   setFilter: (amenity: Amenity, value: boolean) => void;
+  setFilters: (filters: Filters) => void;
+  /**
+   * Show this amenity alone — or, if it is already the only one shown, bring
+   * everything back. Double-tapping a pill is the fast way to say "just this",
+   * and the same gesture has to be the way out of it.
+   */
+  toggleOnlyFilter: (amenity: Amenity) => void;
   setShowRadius: (show: boolean) => void;
   setContinousSearch: (v: boolean) => void;
   setDataStatus: (status: DataStatus) => void;
@@ -63,17 +111,7 @@ export const useAppStore = create<AppState>(set => ({
   errorMessage: null,
   isSearchAreaStale: false,
   around: 1000,
-  filters: {
-    drinking_water: true,
-    toilets: true,
-    shower: true,
-    bicycle_repair_station: true,
-    public_bath: true,
-    device_charging_station: true,
-    playground: true,
-    picnic: true,
-    elevator: true
-  },
+  filters: allFiltersOn(),
   showRadius: true,
   continousSearch: false,
   dataStatus: null,
@@ -87,7 +125,29 @@ export const useAppStore = create<AppState>(set => ({
   setIsSearchAreaStale: stale => set({ isSearchAreaStale: stale }),
   setAround: around => set({ around }),
   setFilter: (amenity, value) =>
-    set(state => ({ filters: { ...state.filters, [amenity]: value } })),
+    set(state => ({
+      filters: persist({ ...state.filters, [amenity]: value })
+    })),
+  setFilters: filters => set({ filters }),
+  toggleOnlyFilter: amenity =>
+    set(state => {
+      /*
+        ⚠️ "Is it already alone?" is decided by the OTHER pills only, never by
+        this one. A double-tap delivers its two `click`s before `dblclick`, so
+        by the time we get here the gesture has already toggled this very pill
+        — asking whether it is on answers a question about our own side effect,
+        and the second double-tap on a solo pill re-isolated it instead of
+        restoring the row (reproduced 2026-08-18 in touch emulation). How many
+        of those clicks the browser let through doesn't change the others.
+        Nothing on at all reads as "show me things" and restores everything.
+      */
+      const othersOn = amenities.some(a => a !== amenity && state.filters[a]);
+      return {
+        filters: persist(
+          othersOn ? filtersWhere(a => a === amenity) : allFiltersOn()
+        )
+      };
+    }),
   setShowRadius: show => set({ showRadius: show }),
   setContinousSearch: v => set({ continousSearch: v }),
   setDataStatus: status => set({ dataStatus: status }),
