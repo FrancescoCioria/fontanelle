@@ -28,12 +28,40 @@ import { json, readArea } from "../lib/request";
  * ⚠️ Longer than the amenity path's 6s response budget, and for the opposite
  * reason: there, answering early is free because D1 already holds something and
  * the fetch continues behind the reply. Here an early answer is simply "no
- * results", which is a lie. Measured on the four instances 2026-07-26, a slow
- * one queues for tens of seconds while another answers in 5 — that is exactly
- * what the hedge in `overpassFetch` is for, and it needs room to fire (8s) and
- * for the second instance to reply.
+ * results", which is a lie.
+ *
+ * ⚠️ Generous on purpose, and it is a **backstop, not a plan**. With the hedge
+ * below the answer normally arrives in under a second — but when the instances
+ * are having a bad day the honest thing is to keep waiting with the spinner up,
+ * not to cut a healthy-but-slow instance off and tell the user OSM is
+ * unreachable. That is what 20s did: every single failure measured on
+ * 2026-08-21 landed at exactly 20.0s, i.e. was ours, not theirs.
  */
-const SEARCH_DEADLINE_MS = 20000;
+const SEARCH_DEADLINE_MS = 40000;
+
+/**
+ * ⚠️ How fast this path widens the net, and the fix for "can't reach
+ * OpenStreetMap" (2026-08-21). Measured against production with the 8s default:
+ * **one in three searches failed**, every failure at exactly the deadline, and
+ * the logs showed the pool had never really been used — the second instance was
+ * launched with 12s left, the third with 4s, the fourth not at all, and three
+ * of the four "failures" were our own abort rather than a server saying no.
+ *
+ * A preset query is *cheap* for Overpass — one tag, one small radius, capped
+ * output — and there is somebody watching a spinner. So the duplicate queries a
+ * fast hedge can cause are the right trade: they only happen when the first
+ * instance is already failing us, and this endpoint's edge cache absorbs the
+ * repeats. The tile path keeps the slow default, where the opposite is true.
+ */
+const SEARCH_HEDGE_MS = 2000;
+
+/**
+ * ⚠️ Higher than the shared default because this Function issues exactly one
+ * Overpass query per request — it is not sharing the Worker's 6 outbound
+ * connections with a tile pool. Two dead instances holding slots must not be
+ * able to keep a healthy one from ever being asked, which is what happened.
+ */
+const SEARCH_MAX_PARALLEL = 6;
 
 /**
  * How long an identical search is served from Cloudflare's edge cache.
@@ -120,7 +148,11 @@ export const onRequestGet: PagesFunction = async context => {
   try {
     const result = await overpassFetch(
       searchQuery(preset, { lat, lon, radius: around }),
-      { deadline: startedAt + SEARCH_DEADLINE_MS }
+      {
+        deadline: startedAt + SEARCH_DEADLINE_MS,
+        hedgeDelay: SEARCH_HEDGE_MS,
+        maxParallel: SEARCH_MAX_PARALLEL
+      }
     );
 
     elements = result.elements;

@@ -10,12 +10,29 @@ import { OverpassElement } from "../../shared/amenities";
  * ⚠️ Only world-wide instances belong here. overpass.osm.ch was removed
  * 2026-07-19: it serves Switzerland only, so failing over to it returned
  * `200 []` for Milan — an empty map with no error, which is worse than a 500.
+ * Every entry below was verified against a query in Milan **and** one in New
+ * York before being added (overpass.osm.jp was rejected the same day: it never
+ * answered at all).
+ *
+ * ⚠️ `z.` and `lz4.` are not decoration. `overpass-api.de` is DNS round-robin
+ * over two machines (65.109.112.52 and 162.55.144.139, measured 2026-08-21) and
+ * those two names are each pinned to one of them. When one machine is sick the
+ * bare name fails about half the time, and asking it again just re-rolls the
+ * same dice; the pinned names let a failed machine be skipped for the healthy
+ * one. Measured that day from the Worker: the bare name returned `521` three
+ * times in a row while answering fine from a laptop, so the failure is specific
+ * to a path, not to the server being down.
  */
 const ENDPOINTS = [
+  // fastest and most reliable in every measurement so far (0.46s New York,
+  // 0.55s Milan, 2026-08-21), and run by somebody else entirely
+  "https://overpass.openstreetmap.fr/api/interpreter",
   "https://overpass-api.de/api/interpreter",
+  "https://z.overpass-api.de/api/interpreter",
+  "https://lz4.overpass-api.de/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.private.coffee/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+  "https://overpass.private.coffee/api/interpreter"
 ];
 
 /**
@@ -37,10 +54,19 @@ const ATTEMPT_TIMEOUT_MS = 30000;
  * was actually serving Paris was ever asked. A tile is fetched once per TTL, so
  * the occasional duplicate query costs Overpass far less than our retry loop
  * would.
+ *
+ * ⚠️ This default is tuned for a **tile** query — expensive for Overpass, run
+ * behind an already-sent response, nobody watching. A caller with somebody
+ * waiting and a cheap query overrides it: see `hedgeDelay` below.
  */
 const HEDGE_DELAY_MS = 8000;
 
-/** Never more than this many instances asked at once for one tile. */
+/**
+ * Never more than this many instances asked at once, by default.
+ * ⚠️ 3 because the tile path runs FETCH_CONCURRENCY (2) of these at a time, and
+ * 2 × 3 is exactly the 6 simultaneous outbound connections a Worker gets. A
+ * caller that is the only thing on the wire can raise it — see `maxParallel`.
+ */
 const MAX_PARALLEL = 3;
 
 /**
@@ -108,10 +134,29 @@ const attempt = async (
 
 export const overpassFetch = async (
   query: string,
-  options: { deadline?: number; signal?: AbortSignal } = {}
+  options: {
+    deadline?: number;
+    signal?: AbortSignal;
+    /**
+     * How long to wait for the current instance before asking the next one too.
+     *
+     * ⚠️ The knob that decides whether a pool of seven is a pool or a queue.
+     * With the 8s default and a 20s deadline the third instance was launched
+     * with 4s left and the fourth was never asked at all: measured against
+     * production 2026-08-21, one in three live searches failed, every one of
+     * them at exactly the deadline, with the log showing three of the four
+     * aborted by *us* rather than by the server. A cheap query with a user
+     * watching should hedge in seconds.
+     */
+    hedgeDelay?: number;
+    /** Raise only when this fetch is the only outbound work of the request. */
+    maxParallel?: number;
+  } = {}
 ): Promise<OverpassResult> => {
   const started = Date.now();
   const deadline = options.deadline ?? started + ATTEMPT_TIMEOUT_MS;
+  const hedgeDelay = options.hedgeDelay ?? HEDGE_DELAY_MS;
+  const maxParallel = options.maxParallel ?? MAX_PARALLEL;
   const errors: string[] = [];
 
   // last known-good first
@@ -150,7 +195,7 @@ export const overpassFetch = async (
     for (;;) {
       if (
         next < order.length &&
-        inflight.size < MAX_PARALLEL &&
+        inflight.size < maxParallel &&
         Date.now() < deadline
       ) {
         launch();
@@ -163,7 +208,7 @@ export const overpassFetch = async (
 
       const hedge = canHedge
         ? new Promise<null>(resolve => {
-            hedgeTimer = setTimeout(() => resolve(null), HEDGE_DELAY_MS);
+            hedgeTimer = setTimeout(() => resolve(null), hedgeDelay);
           })
         : null;
 
