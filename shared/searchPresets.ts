@@ -96,6 +96,11 @@ export const SEARCH_PRESETS: SearchPreset[] = [
   { id: "bus_station", label: "Bus station", group: "Getting around", tags: { amenity: "bus_station" }, keywords: ["coach"] },
   { id: "ferry_terminal", label: "Ferry terminal", group: "Getting around", tags: { amenity: "ferry_terminal" }, keywords: ["boat"] },
   { id: "compressed_air", label: "Air pump", group: "Getting around", tags: { amenity: "compressed_air" }, keywords: ["tyre", "tire", "inflate"] },
+  // ⚠️ Was a first-class amenity until 2026-08-21 — pill, sprite, form, write
+  // path — and it is the reason this file exists: something real, occasionally
+  // needed, and never worth a permanent seat on the map. 86% are plain nodes
+  // (taginfo 2026-08-09: 48.8k of 56.9k), so a search finds nearly all of them.
+  { id: "elevator", label: "Lift", group: "Getting around", tags: { highway: "elevator" }, keywords: ["elevator", "ascensore", "step free", "wheelchair", "stroller"] },
 
   // --- Food & drink ---
   { id: "restaurant", label: "Restaurant", group: "Food & drink", tags: { amenity: "restaurant" } },

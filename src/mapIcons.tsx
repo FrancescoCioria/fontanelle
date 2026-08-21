@@ -7,7 +7,6 @@ import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
 import PicnicMarker from "./PicnicMarker";
-import ElevatorMarker from "./ElevatorMarker";
 import SearchResultMarker from "./SearchResultMarker";
 import {
   Amenity,
@@ -117,12 +116,6 @@ const STATUS_MARKERS: [string, (color: string, fee: boolean) => JSX.Element][] =
       (color, fee) => (
         <PlaygroundMarker size={ICON_SIZE} color={color} fee={fee} />
       )
-    ],
-    [
-      "elevator",
-      (color, fee) => (
-        <ElevatorMarker size={ICON_SIZE} color={color} fee={fee} />
-      )
     ]
   ];
 
@@ -210,7 +203,6 @@ export function getIconName(tags: AmenityTags): string {
     case "public_bath":
     case "playground":
     case "picnic":
-    case "elevator":
       return `${tags.amenity}${status()}`;
   }
 }

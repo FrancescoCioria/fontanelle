@@ -2,11 +2,11 @@
 
 Mappa delle risorse pubbliche all'aperto, basata su OpenStreetMap: fontanelle,
 bagni pubblici, docce, bagni pubblici storici, stazioni di riparazione bici,
-punti di ricarica, parchi giochi, aree picnic e ascensori pubblici.
+punti di ricarica, parchi giochi e aree picnic.
 
 Il nome è storico — è nata per le sole fontanelle, oggi copre l'outdoor in
 generale, con un occhio a chi gira con bambini (parchi giochi, aree picnic,
-bagni col fasciatoio, ascensori per il passeggino).
+bagni col fasciatoio, aree picnic).
 
 **Live: https://fontanelle.pages.dev**
 
@@ -104,7 +104,8 @@ possono modificare e restano aree.
 ## Cercare qualcos'altro
 
 Sulla mappa restano le categorie che servono ogni volta che la apri. Tutto il
-resto — parchimetri, panchine, farmacie, defibrillatori, musei — si cerca: il
+resto — parchimetri, panchine, farmacie, defibrillatori, ascensori — si cerca:
+il
 pulsante «Search» apre un catalogo di una settantina di voci, ne scegli una e
 la mappa entra in modalità ricerca, mostrando solo quei punti nel raggio
 impostato. Con la freccia indietro si torna alla mappa di sempre.

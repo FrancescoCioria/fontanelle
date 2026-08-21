@@ -9,7 +9,6 @@ import PublicBathMarker from "./PublicBathMarker";
 import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
 import PicnicMarker from "./PicnicMarker";
-import ElevatorMarker from "./ElevatorMarker";
 import OpeningHours from "opening_hours";
 import {
   Amenity,
@@ -313,8 +312,6 @@ export const getAmenityMarker = (
       return <PlaygroundMarker size={size} color={color} fee={fee} />;
     case "picnic":
       return <PicnicMarker size={size} color={color} fee={fee} />;
-    case "elevator":
-      return <ElevatorMarker size={size} color={color} fee={fee} />;
   }
 };
 
@@ -336,7 +333,5 @@ export const getAmenityTitle = (amenity: Amenity): string => {
       return "Playground";
     case "picnic":
       return "Picnic Area";
-    case "elevator":
-      return "Elevator";
   }
 };

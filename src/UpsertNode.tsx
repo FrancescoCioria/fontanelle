@@ -242,51 +242,9 @@ export const UpsertNodePopup = (props: Props) => {
           />
         )}
 
-        {node.tags.amenity === "elevator" && (
-          <Select
-            value={node.tags.wheelchair}
-            label="Wheelchair"
-            onChange={v => editNodeTag("wheelchair", v)}
-            options={[
-              { value: "unknown", label: "Unknown" },
-              { value: "yes", label: "Yes" },
-              { value: "no", label: "No" },
-              { value: "limited", label: "Limited" }
-            ]}
-          />
-        )}
 
-        {/* free text: OSM writes lists of floors like `-1;0;1`, so this must
-            not be narrowed to a number */}
-        {node.tags.amenity === "elevator" && (
-          <Input
-            value={node.tags.level}
-            label="Floors Served"
-            onChange={v => editNodeTag("level", v)}
-          />
-        )}
 
-        {node.tags.amenity === "elevator" && (
-          <Input
-            value={node.tags.ref}
-            label="Lift Reference"
-            onChange={v => editNodeTag("ref", v)}
-          />
-        )}
 
-        {node.tags.amenity === "elevator" && (
-          <Select
-            value={node.tags.access === "public" ? "yes" : node.tags.access}
-            label="Access"
-            onChange={v => editNodeTag("access", v)}
-            options={[
-              { value: "unknown", label: "Unknown" },
-              { value: "yes", label: "Yes" },
-              { value: "permissive", label: "Permissive" },
-              { value: "private", label: "Private" }
-            ]}
-          />
-        )}
 
         {(node.tags.amenity === "toilets" ||
           node.tags.amenity === "shower" ||
@@ -311,7 +269,6 @@ export const UpsertNodePopup = (props: Props) => {
           node.tags.amenity === "shower" ||
           node.tags.amenity === "public_bath" ||
           node.tags.amenity === "playground" ||
-          node.tags.amenity === "elevator" ||
           node.tags.amenity === "picnic") && (
           <Select
             value={node.tags.fee}
@@ -329,7 +286,6 @@ export const UpsertNodePopup = (props: Props) => {
           node.tags.amenity === "shower" ||
           node.tags.amenity === "public_bath" ||
           node.tags.amenity === "playground" ||
-          node.tags.amenity === "elevator" ||
           node.tags.amenity === "picnic") &&
         node.tags.fee === "yes" ? (
           <Input
