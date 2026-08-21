@@ -33,7 +33,8 @@ export {
 export type {
   Amenity,
   AmenityTags,
-  OpenStreetMapNode
+  OpenStreetMapNode,
+  OverpassElement
 } from "../shared/amenities";
 
 export type Options = {

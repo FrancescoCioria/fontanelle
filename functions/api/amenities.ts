@@ -5,6 +5,7 @@ import {
   overpassQuery
 } from "../../shared/amenities";
 import { overpassFetch, pool } from "../lib/overpass";
+import { json, readArea } from "../lib/request";
 import {
   claimTile,
   failTile,
@@ -100,51 +101,17 @@ const MAX_TILES_PER_REQUEST = 100;
 /** Guards the response size when someone asks for 15km of central Paris. */
 const MAX_NODES = 12000;
 
-const MIN_RADIUS = 100;
-const MAX_RADIUS = 20000;
-
-// No CORS headers anywhere in here on purpose: in production the Function is
-// served from the same origin as the app, and in dev Vite proxies /api, so the
-// browser never makes a cross-origin request. Opening it up would only invite
-// other sites to spend our Overpass budget.
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store"
-    }
-  });
-
-const number = (value: string | null): number | null => {
-  if (value === null || value.trim() === "") return null;
-
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const onRequestGet: PagesFunction<Env> = async context => {
   const url = new URL(context.request.url);
-  const lat = number(url.searchParams.get("lat"));
-  const lon = number(url.searchParams.get("lon"));
-  const radius = number(url.searchParams.get("radius"));
+  const area = readArea(url);
 
-  if (
-    lat === null ||
-    lon === null ||
-    radius === null ||
-    lat < -90 ||
-    lat > 90 ||
-    lon < -180 ||
-    lon > 180
-  ) {
+  if (!area) {
     return json({ error: "lat, lon and radius are required" }, 400);
   }
 
-  const around = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, radius));
+  const { lat, lon, around } = area;
   // The circle the user asked for, plus a hair so nothing sits exactly on the
   // edge. ⚠️ A `bbox` parameter used to widen this to the whole viewport; it is
   // ignored now, deliberately, because clients cached by the service worker

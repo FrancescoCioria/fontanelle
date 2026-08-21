@@ -14,6 +14,7 @@ import getOpenStreetMapAmenities, {
   RADIUS_MARGIN
 } from "./getOpenStreetMapAmenities";
 import distance from "@turf/distance";
+import { formatDistance } from "./format";
 import localforage from "localforage";
 import MenuIcon from "./MenuIcon";
 import MapboxCircle from "mapbox-gl-circle";
@@ -21,7 +22,7 @@ import LoadingBar, { LoadingBarRef } from "react-top-loading-bar";
 import { Popup } from "./Popup";
 import { UpsertNodePopup } from "./UpsertNode";
 import { Button, Checkbox } from "./form";
-import BottomSheet from "./BottomSheet";
+import BottomSheet, { ResultSheet } from "./BottomSheet";
 import {
   registerMapIcons,
   getIconName,
@@ -30,10 +31,22 @@ import {
   clusterLayerId,
   markerLayerId,
   CLUSTER_MAX_ZOOM,
-  CLUSTER_RADIUS
+  CLUSTER_RADIUS,
+  SEARCH_SOURCE,
+  SEARCH_CLUSTER_LAYER,
+  SEARCH_MARKER_LAYER,
+  SEARCH_ICON
 } from "./mapIcons";
 import Toast from "./Toast";
 import DataStatus from "./DataStatus";
+import SearchBar from "./SearchBar";
+import SearchPicker from "./SearchPicker";
+import {
+  cancelPresetSearch,
+  runPresetSearch,
+  SearchPreset,
+  SearchResultNode
+} from "./search";
 import { loadFilters, useAppStore } from "./store";
 
 import "./map.scss";
@@ -110,6 +123,44 @@ const BASEMAP_MAKI_WE_DRAW = [
 ];
 
 /**
+ * The look of a cluster bubble: the icon of whatever it groups, with the count
+ * as a badge off its corner.
+ *
+ * ⚠️ `text-offset` is in ems of `text-size`, so it must step in lockstep with
+ * `icon-size` or the badge drifts onto the icon body on bigger clusters. It is
+ * written once here because both modes draw bubbles — the amenities and the
+ * search results — and two copies of these numbers could drift by exactly the
+ * one that makes it wrong.
+ */
+const clusterLayout = (icon: string): mapboxgl.SymbolLayout => ({
+  "icon-image": icon,
+  "icon-size": ["step", ["get", "point_count"], 1, 10, 1.2, 50, 1.4],
+  "icon-allow-overlap": true,
+  "icon-ignore-placement": true,
+  "text-field": ["get", "point_count_abbreviated"],
+  "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+  "text-size": 13,
+  "text-anchor": "left",
+  "text-offset": [
+    "step",
+    ["get", "point_count"],
+    ["literal", [0.75, 0.7]],
+    10,
+    ["literal", [0.95, 0.85]],
+    50,
+    ["literal", [1.1, 1]]
+  ],
+  "text-allow-overlap": true,
+  "text-ignore-placement": true
+});
+
+const CLUSTER_PAINT: mapboxgl.SymbolPaint = {
+  "text-color": "#0f172a",
+  "text-halo-color": "#ffffff",
+  "text-halo-width": 2.5
+};
+
+/**
  * ⚠️ By maki, across every `poi_label` layer — not by hiding one layer. The
  * style spreads POIs over ten layers by scalerank, and each one mixes icons we
  * duplicate with icons we don't: `poi-outdoor-features` carries toilets *and*
@@ -156,6 +207,11 @@ function MapFountains() {
   const setErrorMessage = useAppStore(s => s.setErrorMessage);
   const setDataStatus = useAppStore(s => s.setDataStatus);
   const setRetryLastSearch = useAppStore(s => s.setRetryLastSearch);
+  const search = useAppStore(s => s.search);
+  const setSearch = useAppStore(s => s.setSearch);
+  const setIsSearchPickerOpen = useAppStore(s => s.setIsSearchPickerOpen);
+  const openedResult = useAppStore(s => s.openedResult);
+  const setOpenedResult = useAppStore(s => s.setOpenedResult);
 
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const nodesRef = useRef<{ [id: string]: OpenStreetMapNode }>({});
@@ -189,6 +245,12 @@ function MapFountains() {
   continousSearchRef.current = continousSearch;
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
+  const searchRef = useRef(search);
+  searchRef.current = search;
+  // results by key, so a tapped feature can find the object it stands for —
+  // the amenity path's `nodesRef` for the other mode
+  const searchResultsRef = useRef<{ [k: string]: SearchResultNode }>({});
+  const lastSearchNodesRef = useRef<SearchResultNode[] | null>(null);
   const isPickingCoordinatesRef = useRef(false);
   isPickingCoordinatesRef.current =
     upsertNode?.type === "create_without_coordinates" ||
@@ -403,6 +465,159 @@ function MapFountains() {
     });
   }
 
+  /**
+   * Draws whatever the current search holds. ⚠️ No `mergeNearbyNodes` here: the
+   * merge radii are measured per amenity (a playground mapped twice is one
+   * playground; two fountains 20m apart are two fountains), and there is no
+   * such number for a catalogue of seventy. A result is shown as OSM has it.
+   */
+  function updateSearchSource() {
+    getMap(map => {
+      const source = map.getSource(SEARCH_SOURCE) as
+        | mapboxgl.GeoJSONSource
+        | undefined;
+      if (!source) return;
+
+      const nodes = searchRef.current?.nodes || [];
+
+      // ⚠️ Identity, not content: a re-run of the same preset carries the
+      // previous array through the "searching" state on purpose, and setData
+      // would rebuild the supercluster index — invalidating the cluster ids the
+      // tap handler is holding — to draw exactly what is already drawn.
+      if (lastSearchNodesRef.current === nodes) return;
+      lastSearchNodesRef.current = nodes;
+
+      const byKey: { [k: string]: SearchResultNode } = Object.create(null);
+
+      const features: GeoJSON.Feature[] = nodes.map(node => {
+        const key = nodeKey(node);
+        byKey[key] = node;
+
+        return {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [node.lon, node.lat] },
+          properties: { key, name: node.tags.name || "" }
+        };
+      });
+
+      searchResultsRef.current = byKey;
+      source.setData({ type: "FeatureCollection", features });
+    });
+  }
+
+  /**
+   * The mode switch, and the whole of it: in search mode every amenity layer is
+   * hidden and the results layer is shown.
+   *
+   * ⚠️ Visibility, not empty sources. Blanking the eight amenity sources would
+   * throw away eight supercluster indexes and rebuild them on the way back,
+   * and the nodes are still in `nodesRef` either way — this is a question about
+   * what is *drawn*, not about what is loaded. It also means a hidden layer
+   * returns nothing from `queryRenderedFeatures`, so the tap handler needs no
+   * mode branch of its own.
+   */
+  function applySearchMode(map: mapboxgl.Map) {
+    const searching = !!searchRef.current;
+
+    const setVisible = (layer: string, visible: boolean) => {
+      if (map.getLayer(layer)) {
+        map.setLayoutProperty(layer, "visibility", visible ? "visible" : "none");
+      }
+    };
+
+    amenities.forEach(amenity => {
+      setVisible(clusterLayerId(amenity), !searching);
+      setVisible(markerLayerId(amenity), !searching);
+    });
+
+    setVisible(SEARCH_CLUSTER_LAYER, searching);
+    setVisible(SEARCH_MARKER_LAYER, searching);
+  }
+
+  /**
+   * One live lookup around a point. ⚠️ Nothing about it touches the amenity
+   * path: no tiles, no D1 cache, no IndexedDB, no `partial` retry chain. It
+   * either answers or it doesn't, and `SearchBar` says which.
+   */
+  function runSearch(preset: SearchPreset) {
+    getMap(map => {
+      const c = map.getCenter();
+
+      // the sheet behind us is about to stop being drawn
+      setOpenedNode(null);
+      setOpenedResult(null);
+
+      /*
+        ⚠️ `isSearchAreaStale` and `previousCenterRef` are NOT touched here, and
+        that is the whole point of them: they say whether the *amenity* data
+        covers what is on screen, and a preset search fetches none of it. This
+        used to clear the flag, so panning 5km inside search mode and then
+        leaving it came back to a subdued "✓ Search again" over an area nobody
+        had ever fetched — the button claiming a coverage that doesn't exist,
+        which is exactly what "cleared in one place, `updateAmenities`" exists
+        to prevent.
+      */
+      const radius = aroundRef.current;
+
+      /*
+        ⚠️ Re-running the same preset keeps the pins that are already up. They
+        are the best answer available until the new one lands, and blanking the
+        source only to refill it a second later is two supercluster rebuilds and
+        a flash of empty map over the very area being asked about. A *different*
+        preset clears at once: benches on screen while "Pharmacy" loads would be
+        answering the wrong question.
+      */
+      const showing =
+        searchRef.current?.preset.id === preset.id
+          ? searchRef.current.nodes
+          : [];
+
+      setSearch({
+        preset,
+        status: "searching",
+        radius,
+        nodes: showing,
+        tooMany: false
+      });
+
+      if (loadingBarRef.current) {
+        // @ts-ignore (continuousStart args are optional)
+        loadingBarRef.current.continuousStart();
+      }
+
+      /*
+        ⚠️ There is exactly one answer to "is this reply still wanted", and it
+        is the `AbortController` inside `runPresetSearch`: a newer search aborts
+        the previous one, and leaving the mode calls `cancelPresetSearch`. Both
+        supersessions therefore arrive here as an `AbortError`, and a settled
+        promise's callbacks always run before the next click can be handled, so
+        a stale reply cannot reach `setSearch`. This used to be tracked a second
+        time by a run counter, which meant one question read from two sources —
+        and both bugs it was written for (a late answer restoring search mode,
+        and a loading bar left spinning after a back press) came out of the two
+        disagreeing. ⚠️ No `.finally`: on abort the bar belongs to whoever
+        aborted us — the newer search, or the leave path below.
+      */
+      runPresetSearch(preset, { lat: c.lat, lng: c.lng, radius })
+        .then(({ nodes, tooMany }) => {
+          setSearch({ preset, status: "done", radius, nodes, tooMany });
+          if (loadingBarRef.current) loadingBarRef.current.complete();
+        })
+        .catch(e => {
+          if (e instanceof DOMException && e.name === "AbortError") return;
+
+          setSearch({
+            preset,
+            status: "failed",
+            radius,
+            nodes: [],
+            tooMany: false
+          });
+          if (loadingBarRef.current) loadingBarRef.current.complete();
+        });
+    });
+  }
+
   function showRadiusFn() {
     getMap(map => {
       const center = {
@@ -462,7 +677,11 @@ function MapFountains() {
           // "covered" during the gap between the pan and the request.
           setIsSearchAreaStale(true);
 
-          if (continousSearchRef.current) {
+          // ⚠️ Not while a search is on screen: those amenities aren't drawn,
+          // so this would spend an Overpass round trip (and the loading bar) on
+          // something the user cannot see. The flag above still moves, so the
+          // button is right the moment they come back.
+          if (continousSearchRef.current && !searchRef.current) {
             previousCenterRef.current = map.getCenter();
             updateAmenitiesFnRef.current();
           }
@@ -644,36 +863,9 @@ function MapFountains() {
           type: "symbol",
           source: sourceId(amenity),
           filter: ["has", "point_count"],
-          layout: {
-            // the amenity's own icon, so a cluster still says WHAT it groups
-            "icon-image": getClusterIconName(amenity),
-            "icon-size": ["step", ["get", "point_count"], 1, 10, 1.2, 50, 1.4],
-            "icon-allow-overlap": true,
-            "icon-ignore-placement": true,
-            // count as a badge off the icon's corner. ⚠️ text-offset is in ems
-            // of text-size, so it has to step in lockstep with icon-size or the
-            // badge drifts onto the icon body on bigger clusters.
-            "text-field": ["get", "point_count_abbreviated"],
-            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-            "text-size": 13,
-            "text-anchor": "left",
-            "text-offset": [
-              "step",
-              ["get", "point_count"],
-              ["literal", [0.75, 0.7]],
-              10,
-              ["literal", [0.95, 0.85]],
-              50,
-              ["literal", [1.1, 1]]
-            ],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true
-          },
-          paint: {
-            "text-color": "#0f172a",
-            "text-halo-color": "#ffffff",
-            "text-halo-width": 2.5
-          }
+          // the amenity's own icon, so a cluster still says WHAT it groups
+          layout: clusterLayout(getClusterIconName(amenity)),
+          paint: CLUSTER_PAINT
         });
       });
 
@@ -695,6 +887,54 @@ function MapFountains() {
         });
       });
 
+      // The other mode, added last so its results paint above everything —
+      // though nothing else is visible while they are. Hidden until a search
+      // happens; `applySearchMode` owns that switch from here on.
+      map.addSource(SEARCH_SOURCE, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+        cluster: true,
+        clusterMaxZoom: CLUSTER_MAX_ZOOM,
+        clusterRadius: CLUSTER_RADIUS
+      });
+
+      map.addLayer({
+        id: SEARCH_CLUSTER_LAYER,
+        type: "symbol",
+        source: SEARCH_SOURCE,
+        filter: ["has", "point_count"],
+        layout: { ...clusterLayout(SEARCH_ICON), visibility: "none" },
+        paint: CLUSTER_PAINT
+      });
+
+      map.addLayer({
+        id: SEARCH_MARKER_LAYER,
+        type: "symbol",
+        source: SEARCH_SOURCE,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          visibility: "none",
+          "icon-image": SEARCH_ICON,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          // ⚠️ The name is most of the answer here, and the reason results can
+          // afford one label each: they are one category at a time, so the pin
+          // says nothing the bar hasn't already said. `text-optional` keeps a
+          // label that doesn't fit from taking its icon down with it.
+          "text-field": ["get", "name"],
+          "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+          "text-size": 11,
+          "text-anchor": "top",
+          "text-offset": [0, 0.9],
+          "text-optional": true
+        },
+        paint: {
+          "text-color": "#0f172a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 2
+        }
+      });
+
       mapRef.current = map;
 
       const markerLayers = amenities.map(markerLayerId);
@@ -708,6 +948,18 @@ function MapFountains() {
         // easeTo there would silently move the pin the user is placing
         if (isPickingCoordinatesRef.current) return;
 
+        // ⚠️ No mode branch: outside search mode these layers are hidden, and
+        // a hidden layer renders nothing for `queryRenderedFeatures` to find.
+        const [result] = map.queryRenderedFeatures(e.point, {
+          layers: [SEARCH_MARKER_LAYER]
+        });
+
+        if (result?.properties?.key) {
+          const node = searchResultsRef.current[result.properties.key];
+          if (node) setOpenedResult(node);
+          return;
+        }
+
         const [marker] = map.queryRenderedFeatures(e.point, {
           layers: markerLayers
         });
@@ -719,7 +971,7 @@ function MapFountains() {
         }
 
         const [cluster] = map.queryRenderedFeatures(e.point, {
-          layers: clusterLayers
+          layers: [...clusterLayers, SEARCH_CLUSTER_LAYER]
         });
 
         if (!cluster) return;
@@ -741,7 +993,12 @@ function MapFountains() {
       });
 
       // Pointer cursor on hover
-      [...markerLayers, ...clusterLayers].forEach(layer => {
+      [
+        ...markerLayers,
+        ...clusterLayers,
+        SEARCH_MARKER_LAYER,
+        SEARCH_CLUSTER_LAYER
+      ].forEach(layer => {
         map.on("mouseenter", layer, () => {
           map.getCanvas().style.cursor = "pointer";
         });
@@ -822,7 +1079,51 @@ function MapFountains() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
+  // Entering *and* leaving search mode: the same call puts the amenity layers
+  // back, so there is one place that decides what the map is showing.
+  useEffect(() => {
+    if (!search) {
+      // Leaving cancels: the answer has nowhere to land, and the request stops
+      // being downloaded for nobody. ⚠️ The bar this run started is finished
+      // here, because the aborted promise deliberately doesn't touch it.
+      cancelPresetSearch();
+      if (loadingBarRef.current) loadingBarRef.current.complete();
+    }
+
+    getMap(map => {
+      applySearchMode(map);
+      updateSearchSource();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
   // --- Render ---
+
+  /**
+   * Who owns the bottom of the screen. ⚠️ One name for a question asked at
+   * several gates: a third openable thing must not mean remembering to add a
+   * term to each of them, because a forgotten one is an overlap, not an error.
+   */
+  const sheetIsOpen = !!(openedNode || openedResult || upsertNode);
+
+  /**
+   * The one decision behind "Search this area", read three times by the button.
+   *
+   * ⚠️ In search mode it re-runs the *search* — the button means "answer the
+   * question I'm asking, here" — and is never "covered": a search is answered
+   * live from nothing, so no area is ever already done. `isSearchAreaStale`
+   * belongs to the amenity data, which this mode neither draws nor fetches.
+   */
+  const areaAction = search
+    ? { covered: false, run: () => runSearch(search.preset) }
+    : {
+        covered: !isSearchAreaStale,
+        run: () =>
+          getMap(map => {
+            previousCenterRef.current = map.getCenter();
+            updateAmenities();
+          })
+      };
 
   const pillConfig: Record<Amenity, { label: string; color: string }> = {
     drinking_water: { label: "Water", color: "#0ea5e9" },
@@ -851,7 +1152,35 @@ function MapFountains() {
 
       <div id="map" style={{ display: "flex", flexGrow: 1 }} />
 
+      {!search && (
       <div className="filter-pills">
+        {/*
+          The way into the other mode, and deliberately the first thing in the
+          row: this strip scrolls, and an entry point you have to scroll to find
+          is one nobody finds. It is not a filter — it doesn't toggle anything —
+          so it doesn't wear a filter's colours.
+        */}
+        <button
+          className="filter-pill filter-pill--search"
+          aria-label="Search for a place type"
+          onClick={() => setIsSearchPickerOpen(true)}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <line x1="16.5" y1="16.5" x2="21" y2="21" />
+          </svg>
+          Search
+        </button>
+
         {amenities.map(amenity => {
           const { label, color } = pillConfig[amenity];
           const active = filters[amenity];
@@ -886,10 +1215,20 @@ function MapFountains() {
           );
         })}
       </div>
+      )}
 
-      <DataStatus />
+      {search && (
+        <SearchBar onRetry={() => runSearch(search.preset)} />
+      )}
+
+      <SearchPicker onPick={runSearch} />
+
+      {/* the tile-freshness banner has nothing true to say about a search —
+          SearchBar carries that mode's own status */}
+      {!search && <DataStatus />}
 
       {openedNode && <BottomSheet />}
+      {openedResult && <ResultSheet />}
 
       {/*
         ⚠️ Always on screen; only the node sheet and the add/edit flow, which
@@ -899,19 +1238,14 @@ function MapFountains() {
         Coverage is a **state** of the button, never a gate on it: the subdued
         "Search again" says the area is done, and searches anyway when pressed.
       */}
-      {openedNode === null && upsertNode === null && (
+      {!sheetIsOpen && (
         <button
           className={`search-this-area-button${
-            isSearchAreaStale ? "" : " search-this-area-button--covered"
+            areaAction.covered ? " search-this-area-button--covered" : ""
           }`}
-          onClick={() => {
-            getMap(map => {
-              previousCenterRef.current = map.getCenter();
-              updateAmenities();
-            });
-          }}
+          onClick={areaAction.run}
         >
-          {isSearchAreaStale ? (
+          {!areaAction.covered ? (
             "Search this area"
           ) : (
             <>
@@ -980,7 +1314,7 @@ function MapFountains() {
         <div className="radius-control">
           <div className="radius-control-header">
             <span className="radius-control-label">Search radius</span>
-            <span className="radius-control-value">{around >= 1000 ? `${(around / 1000).toFixed(around % 1000 === 0 ? 0 : 1)} km` : `${around} m`}</span>
+            <span className="radius-control-value">{formatDistance(around)}</span>
           </div>
           <input
             aria-label="Search radius"
@@ -1032,7 +1366,9 @@ function MapFountains() {
 
       </Popup>
 
-      {!upsertNode && (
+      {/* nothing in the catalogue is writable, so the add button has no
+          meaning while a search is on screen */}
+      {!upsertNode && !search && (
         <button
           className="add-button"
           aria-label="Add new amenity"

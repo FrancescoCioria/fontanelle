@@ -2,6 +2,7 @@ import { create } from "zustand";
 import localforage from "localforage";
 import { amenities } from "./getOpenStreetMapAmenities";
 import type { OpenStreetMapNode, Amenity } from "./getOpenStreetMapAmenities";
+import type { SearchPreset, SearchResultNode } from "./search";
 import type { UpsertNode } from "./UpsertNode";
 
 type Filters = { [k in Amenity]: boolean };
@@ -12,6 +13,8 @@ const filtersWhere = (on: (amenity: Amenity) => boolean): Filters =>
   Object.fromEntries(amenities.map(a => [a, on(a)])) as Filters;
 
 const allFiltersOn = () => filtersWhere(() => true);
+
+const onlyFilter = (amenity: Amenity) => filtersWhere(a => a === amenity);
 
 /**
  * ⚠️ Saved filters are merged **over** the defaults, never used as-is: an
@@ -62,8 +65,38 @@ export type DataStatus =
   | { kind: "empty" }
   | null;
 
+/**
+ * A run of the generic search — the map's other mode. ⚠️ Deliberately not
+ * persisted and not cached: it is one live question about one spot, and it is
+ * meant to be gone when you leave it. See `shared/searchPresets.ts`.
+ */
+export type SearchRun = {
+  preset: SearchPreset;
+  status: "searching" | "done" | "failed";
+  /**
+   * The radius this run actually asked for. ⚠️ Not read from `around` at render
+   * time: the empty-result line tells the user to change the radius, so the
+   * very next thing they do makes the live value disagree with the answer on
+   * screen — "no benches within 15 km" over a result set fetched at 1 km.
+   */
+  radius: number;
+  nodes: SearchResultNode[];
+  /** Over the cap in this radius: nothing is drawn, on purpose. */
+  tooMany: boolean;
+};
+
 type AppState = {
   openedNode: OpenStreetMapNode | null;
+  /**
+   * The search result whose sheet is open. ⚠️ A separate field from
+   * `openedNode` rather than a widened one: a result carries raw OSM tags with
+   * no `amenity` discriminant, and everything hanging off `openedNode`
+   * (`isEditable`, `getAmenityMarker`, the edit button) reads that field.
+   */
+  openedResult: SearchResultNode | null;
+  /** Non-null = the map is in search mode: only these results are drawn. */
+  search: SearchRun | null;
+  isSearchPickerOpen: boolean;
   upsertNode: UpsertNode | null;
   isMenuOpen: boolean;
   isAddMenuOpen: boolean;
@@ -83,6 +116,9 @@ type AppState = {
   retryLastSearch: (() => void) | null;
 
   setOpenedNode: (node: OpenStreetMapNode | null) => void;
+  setOpenedResult: (node: SearchResultNode | null) => void;
+  setSearch: (search: SearchRun | null) => void;
+  setIsSearchPickerOpen: (isOpen: boolean) => void;
   setUpsertNode: (node: UpsertNode | null) => void;
   setIsMenuOpen: (isOpen: boolean) => void;
   setIsAddMenuOpen: (isOpen: boolean) => void;
@@ -97,6 +133,13 @@ type AppState = {
    * and the same gesture has to be the way out of it.
    */
   toggleOnlyFilter: (amenity: Amenity) => void;
+  /**
+   * Show this amenity alone, full stop. ⚠️ Not the same call as the one above:
+   * this one is reached from the search picker, where the amenity being asked
+   * for is one the map already carries, and "you asked for benches, here is
+   * everything" would be a strange answer to a search.
+   */
+  showOnlyFilter: (amenity: Amenity) => void;
   setShowRadius: (show: boolean) => void;
   setContinousSearch: (v: boolean) => void;
   setDataStatus: (status: DataStatus) => void;
@@ -105,6 +148,9 @@ type AppState = {
 
 export const useAppStore = create<AppState>(set => ({
   openedNode: null,
+  openedResult: null,
+  search: null,
+  isSearchPickerOpen: false,
   upsertNode: null,
   isMenuOpen: false,
   isAddMenuOpen: false,
@@ -118,6 +164,12 @@ export const useAppStore = create<AppState>(set => ({
   retryLastSearch: null,
 
   setOpenedNode: node => set({ openedNode: node }),
+  setOpenedResult: node => set({ openedResult: node }),
+  setSearch: search =>
+    // leaving search mode takes its open sheet with it: the result behind it is
+    // about to stop being drawn
+    set(search ? { search } : { search: null, openedResult: null }),
+  setIsSearchPickerOpen: isOpen => set({ isSearchPickerOpen: isOpen }),
   setUpsertNode: node => set({ upsertNode: node }),
   setIsMenuOpen: isOpen => set({ isMenuOpen: isOpen }),
   setIsAddMenuOpen: isOpen => set({ isAddMenuOpen: isOpen }),
@@ -129,6 +181,7 @@ export const useAppStore = create<AppState>(set => ({
       filters: persist({ ...state.filters, [amenity]: value })
     })),
   setFilters: filters => set({ filters }),
+  showOnlyFilter: amenity => set({ filters: persist(onlyFilter(amenity)) }),
   toggleOnlyFilter: amenity =>
     set(state => {
       /*
@@ -143,9 +196,7 @@ export const useAppStore = create<AppState>(set => ({
       */
       const othersOn = amenities.some(a => a !== amenity && state.filters[a]);
       return {
-        filters: persist(
-          othersOn ? filtersWhere(a => a === amenity) : allFiltersOn()
-        )
+        filters: persist(othersOn ? onlyFilter(amenity) : allFiltersOn())
       };
     }),
   setShowRadius: show => set({ showRadius: show }),

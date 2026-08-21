@@ -8,6 +8,7 @@ import DeviceChargingStationMarker from "./DeviceChargingStationMarker";
 import PlaygroundMarker from "./PlaygroundMarker";
 import PicnicMarker from "./PicnicMarker";
 import ElevatorMarker from "./ElevatorMarker";
+import SearchResultMarker from "./SearchResultMarker";
 import {
   Amenity,
   AmenityTags,
@@ -21,6 +22,19 @@ import {
 export const sourceId = (amenity: Amenity) => `amenities-${amenity}-source`;
 export const clusterLayerId = (amenity: Amenity) => `amenities-${amenity}-cluster`;
 export const markerLayerId = (amenity: Amenity) => `amenities-${amenity}-marker`;
+
+/**
+ * The generic search draws into its own source, for the same reason each
+ * amenity has one: Mapbox clusters per source, and results have to cluster
+ * among themselves. There is exactly one because a search shows one preset at
+ * a time.
+ */
+export const SEARCH_SOURCE = "search-results-source";
+export const SEARCH_CLUSTER_LAYER = "search-results-cluster";
+export const SEARCH_MARKER_LAYER = "search-results-marker";
+
+/** The single sprite every search result wears — see SearchResultMarker. */
+export const SEARCH_ICON = "search-result";
 
 /** At and below this zoom, nearby amenities collapse into a numbered bubble. */
 export const CLUSTER_MAX_ZOOM = 14;
@@ -157,6 +171,7 @@ export async function registerMapIcons(map: mapboxgl.Map): Promise<void> {
     "device_charging_station",
     renderIcon(<DeviceChargingStationMarker size={ICON_SIZE} />)
   ]);
+  svgEntries.push([SEARCH_ICON, renderIcon(<SearchResultMarker size={ICON_SIZE} />)]);
 
   for (const color of COLORS) {
     for (const fee of FEES) {

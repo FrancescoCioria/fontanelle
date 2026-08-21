@@ -101,6 +101,25 @@ Un punto picnic aggiunto dall'app è sempre un **tavolo**
 sarebbe una mappa peggiore di nessun punto. Le aree picnic già esistenti si
 possono modificare e restano aree.
 
+## Cercare qualcos'altro
+
+Sulla mappa restano le categorie che servono ogni volta che la apri. Tutto il
+resto — parchimetri, panchine, farmacie, defibrillatori, musei — si cerca: il
+pulsante «Search» apre un catalogo di una settantina di voci, ne scegli una e
+la mappa entra in modalità ricerca, mostrando solo quei punti nel raggio
+impostato. Con la freccia indietro si torna alla mappa di sempre.
+
+È una domanda sola, fatta sul momento: i risultati non finiscono in nessuna
+cache, quindi sono sempre aggiornati, non si vedono offline e non si possono
+modificare dall'app. È il posto che cerchi tre volte l'anno, e sempre dove già
+sai di dover guardare.
+
+Se in quel raggio ce ne sono più di 2.000 — le panchine entro 15 km, per dire —
+non ne disegna nessuno e te lo dice. Overpass li restituisce nel suo ordine,
+non dal più vicino: mostrarne 2.000 presi così sarebbe una mappa che promette
+una copertura che non ha, e che nasconde proprio quello dietro l'angolo. Si
+stringe il raggio.
+
 ## Note tecniche
 
 Dettagli di architettura, vincoli e trappole note sono in

@@ -248,9 +248,16 @@ export type OpenStreetMapNode = {
   elementType?: "node" | "way" | "relation";
 };
 
-/** Unique across element types: way/123 and node/123 are different objects. */
-export const nodeKey = (node: OpenStreetMapNode): string =>
-  `${node.elementType || "node"}/${node.id}`;
+/**
+ * Unique across element types: way/123 and node/123 are different objects.
+ * ⚠️ Takes only the two fields it uses, so a generic search result — which has
+ * raw OSM tags and no `amenity` — is keyed by the very same function. Two
+ * spellings of "which object is this" is one too many.
+ */
+export const nodeKey = (node: {
+  id: number;
+  elementType?: "node" | "way" | "relation";
+}): string => `${node.elementType || "node"}/${node.id}`;
 
 /** Only plain nodes we know how to tag back can be created/edited/deleted. */
 export const isEditable = (node: OpenStreetMapNode): boolean =>

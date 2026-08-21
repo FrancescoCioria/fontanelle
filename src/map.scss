@@ -111,6 +111,201 @@ $transition: 0.2s ease;
   }
 }
 
+// The way into search mode. Not a filter: no amenity colour, no on/off state.
+.filter-pill--search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: $border;
+  background: $surface;
+  color: $text;
+  box-shadow: $shadow-sm;
+}
+
+// === Search Mode ===
+// Takes the pill row's place: in search mode there is one question on screen,
+// and this is it.
+.search-bar {
+  position: fixed;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 460px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 8px 0 4px;
+  background: $surface;
+  border-radius: 22px;
+  box-shadow: $shadow-md;
+  animation: slideUp 0.25s ease;
+}
+
+.search-bar-back,
+.search-bar-preset {
+  border: none;
+  background: none;
+  font: inherit;
+  color: $text;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  height: 36px;
+
+  &:active {
+    opacity: 0.6;
+  }
+}
+
+.search-bar-back {
+  width: 40px;
+  justify-content: center;
+  flex-shrink: 0;
+  color: $text-secondary;
+}
+
+.search-bar-preset {
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+  padding: 0 4px;
+  color: $text-secondary;
+}
+
+.search-bar-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: $text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-bar-count {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: $primary-light;
+  color: $primary-dark;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+// === Search Picker ===
+.search-picker-input {
+  margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid $border;
+  border-radius: $radius-sm;
+  font: inherit;
+  font-size: 16px; // ⚠️ 16px or iOS Safari zooms the page on focus
+  color: $text;
+  outline: none;
+
+  &:focus {
+    border-color: $primary;
+  }
+}
+
+.search-picker-list {
+  margin-top: 12px;
+  max-height: min(46vh, 380px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.search-picker-group {
+  position: sticky;
+  top: 0;
+  background: $surface;
+  padding: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: $text-secondary;
+}
+
+.search-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 8px;
+  border: none;
+  border-radius: $radius-sm;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:hover {
+    background: #f8fafc;
+  }
+
+  &:active {
+    background: $primary-light;
+  }
+}
+
+.search-picker-row-icon {
+  display: flex;
+  flex-shrink: 0;
+  width: 22px;
+}
+
+.search-picker-row-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin: 0 6px;
+  border-radius: 50%;
+  background: $primary;
+}
+
+.search-picker-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-picker-row-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: $text;
+}
+
+.search-picker-row-tag {
+  font-size: 12px;
+  color: $text-secondary;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// what an already-on-the-map row says instead of a tag: prose, not a tag, so
+// it doesn't read as something to type
+.search-picker-row-hint {
+  font-size: 12px;
+  color: $text-secondary;
+}
+
+.search-picker-empty {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 14px;
+  color: $text-secondary;
+}
+
 // === Add Button ===
 .add-button,
 .menu-button,

@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import {
   getAmenityMarker,
   getAmenityTitle,
   isEditable,
-  OpenStreetMapNode
+  normalizeElement,
+  updateCachedItems
 } from "./getOpenStreetMapAmenities";
+import type { OverpassElement } from "./getOpenStreetMapAmenities";
+import SearchResultMarker from "./SearchResultMarker";
 import { Button } from "./form";
 import capitalize from "lodash/capitalize";
 import { osmGetNode } from "./osm";
@@ -54,22 +57,52 @@ const mapFileImage = (v: any) =>
     ? `https://commons.wikimedia.org/wiki/${v.replaceAll(" ", "_")}`
     : v;
 
-export default () => {
-  const node = useAppStore(s => s.openedNode)!;
-  const setOpenedNode = useAppStore(s => s.setOpenedNode);
-  const setUpsertNode = useAppStore(s => s.setUpsertNode);
-
+/**
+ * The sheet itself: drag handle, directions, who touched it last, every tag.
+ *
+ * ⚠️ Shared by the two things the map can open — an amenity it carries, and a
+ * generic search result — because the only differences are the heading and
+ * which buttons apply. Everything below the buttons already worked on raw tags:
+ * this sheet has always rendered `Object.keys(tags)` rather than a per-amenity
+ * form, which is why a search result fits it without a second sheet existing.
+ */
+const Sheet = (props: {
+  title: string;
+  subtitle?: string;
+  icon: JSX.Element;
+  node: {
+    id: number;
+    lat: number;
+    lon: number;
+    elementType?: "node" | "way" | "relation";
+    // ⚠️ `| undefined` so an `AmenityTags` — a union of aliased object types
+    // whose every tag is optional — is assignable here. Without it the amenity
+    // sheet would need a cast to hand its own node to its own sheet.
+    tags: { [k: string]: string | undefined };
+  };
+  /** Anything beyond Directions — e.g. Edit, which only an amenity node gets. */
+  actions?: ReactNode;
+  /** The raw OSM element this sheet just read back, for whoever caches it. */
+  onFetched?: (element: OverpassElement) => void;
+  onClose: () => void;
+}): JSX.Element => {
+  const { node } = props;
   const [isOpen, updateOpen] = useState(false);
 
   const [fetchedNode, updateFetchedNode] = useState<
-    (OpenStreetMapNode & { timestamp: string; user: string }) | null
+    { timestamp: string; user: string } | null
   >(null);
 
   useEffect(() => {
     updateOpen(true);
+    updateFetchedNode(null);
     osmGetNode(node)
-      .then(res => updateFetchedNode(res))
+      .then(res => {
+        updateFetchedNode(res);
+        props.onFetched?.(res);
+      })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node]);
 
   const openUrl = (url: string) => window.open(url, "_blank");
@@ -79,7 +112,7 @@ export default () => {
       open={isOpen}
       onOpenChange={open => {
         updateOpen(open);
-        if (!open) setTimeout(() => setOpenedNode(null), 300);
+        if (!open) setTimeout(props.onClose, 300);
       }}
     >
       <Drawer.Portal>
@@ -112,7 +145,7 @@ export default () => {
           }}
         >
           <Drawer.Title style={{ position: "absolute", left: -9999 }}>
-            {getAmenityTitle(node.tags.amenity)}
+            {props.title}
           </Drawer.Title>
 
           {/* Drag handle */}
@@ -148,16 +181,24 @@ export default () => {
                 marginBottom: 16
               }}
             >
-              {getAmenityMarker(node.tags, 56)}
+              {props.icon}
               <span
                 style={{
                   marginLeft: 14,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: "#1e293b"
+                  display: "flex",
+                  flexDirection: "column"
                 }}
               >
-                {getAmenityTitle(node.tags.amenity)}
+                <span
+                  style={{ fontSize: 20, fontWeight: 700, color: "#1e293b" }}
+                >
+                  {props.title}
+                </span>
+                {props.subtitle && (
+                  <span style={{ fontSize: 14, color: "#64748b" }}>
+                    {props.subtitle}
+                  </span>
+                )}
               </span>
             </div>
 
@@ -189,16 +230,7 @@ export default () => {
                 />
               )}
 
-              {isEditable(node) && (
-                <Button
-                  style={{ flex: 1 }}
-                  label="Edit"
-                  onClick={() => {
-                    setUpsertNode({ type: "update", node });
-                    setOpenedNode(null);
-                  }}
-                />
-              )}
+              {props.actions}
             </div>
 
             {fetchedNode ? (
@@ -235,15 +267,71 @@ export default () => {
             )}
 
             {Object.keys(node.tags).map(k => (
-              <Amenity
-                key={k}
-                label={k}
-                value={mapFileImage(node.tags[k as never])}
-              />
+              <Amenity key={k} label={k} value={mapFileImage(node.tags[k])} />
             ))}
           </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+};
+
+/**
+ * A search result. ⚠️ No Edit button, and that is structural, not an omission:
+ * the write path serializes a known tag pair per amenity (`toOsmTags`), and the
+ * catalogue is 70 tag sets with no forms and no inverse. Saving one back would
+ * mean guessing what the object is.
+ */
+export const ResultSheet = (): JSX.Element => {
+  const node = useAppStore(s => s.openedResult)!;
+  const setOpenedResult = useAppStore(s => s.setOpenedResult);
+  const preset = useAppStore(s => s.search?.preset);
+
+  const label = preset?.label || "Search result";
+
+  return (
+    <Sheet
+      title={node.tags.name || label}
+      subtitle={node.tags.name ? label : undefined}
+      icon={<SearchResultMarker size={56} />}
+      node={node}
+      onClose={() => setOpenedResult(null)}
+    />
+  );
+};
+
+export default (): JSX.Element => {
+  const node = useAppStore(s => s.openedNode)!;
+  const setOpenedNode = useAppStore(s => s.setOpenedNode);
+  const setUpsertNode = useAppStore(s => s.setUpsertNode);
+
+  return (
+    <Sheet
+      title={getAmenityTitle(node.tags.amenity)}
+      icon={getAmenityMarker(node.tags, 56)}
+      node={node}
+      /*
+        ⚠️ Only the amenity sheet refreshes the amenity cache. The OSM API
+        returns raw tags (`leisure=playground`, `tourism=picnic_site`) and no
+        centre for ways — normalize before caching, or the cache is poisoned.
+      */
+      onFetched={element => {
+        const normalized = normalizeElement(element);
+        if (normalized) updateCachedItems([normalized]);
+      }}
+      actions={
+        isEditable(node) && (
+          <Button
+            style={{ flex: 1 }}
+            label="Edit"
+            onClick={() => {
+              setUpsertNode({ type: "update", node });
+              setOpenedNode(null);
+            }}
+          />
+        )
+      }
+      onClose={() => setOpenedNode(null)}
+    />
   );
 };

@@ -1,8 +1,4 @@
-import {
-  normalizeElement,
-  OpenStreetMapNode,
-  updateCachedItems
-} from "./getOpenStreetMapAmenities";
+import { OpenStreetMapNode } from "./getOpenStreetMapAmenities";
 import { osmAuth as _osmAuth } from "osm-auth";
 
 export const osmAuth = new _osmAuth({
@@ -58,7 +54,21 @@ export const osmDeleteNode = (
   node: OpenStreetMapNode
 ): Promise<OpenStreetMapNode> => osmWrite("delete", node);
 
-export const osmGetNode = async (node: OpenStreetMapNode) => {
+/**
+ * Fresh tags, timestamp and author for one object, straight from OSM.
+ *
+ * ⚠️ A read, and nothing else. It takes only the two fields it uses, because
+ * the same sheet opens generic search results — objects with raw tags and no
+ * `amenity` — and those must leave nothing behind (`shared/searchPresets.ts`).
+ * Refreshing the amenity cache used to happen here, which quietly wrote a
+ * search result into it whenever the object also read as one of ours: the
+ * `fountain` preset returns drinkable fountains by design. That belongs to
+ * whoever owns amenity data, and now lives there (`BottomSheet`).
+ */
+export const osmGetNode = async (node: {
+  id: number;
+  elementType?: "node" | "way" | "relation";
+}) => {
   const type = node.elementType || "node";
 
   const {
@@ -66,14 +76,6 @@ export const osmGetNode = async (node: OpenStreetMapNode) => {
   } = await fetch(
     `https://www.openstreetmap.org/api/0.6/${type}/${node.id}.json`
   ).then(res => res.json());
-
-  // the OSM API returns raw tags (e.g. `leisure=playground`, `tourism=picnic_site`)
-  // and no center for
-  // ways/relations — normalize before caching, or we poison the cache
-  const normalized = normalizeElement(fetchedNode);
-  if (normalized) {
-    updateCachedItems([normalized]);
-  }
 
   return fetchedNode;
 };
